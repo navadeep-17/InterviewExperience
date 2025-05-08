@@ -1,29 +1,133 @@
 import React, { useState } from 'react';
-import { Book, Calendar, Eye, EyeOff, Key, Mail, User } from 'react-feather';
+import { Book, Calendar, Check, Eye, EyeOff, Key, Mail, User } from 'react-feather';
 import { useNavigate } from 'react-router-dom';
 
 function A() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate(); // Correct usage of useNavigate
+  const [showOtpField, setShowOtpField] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     fullName: '',
     gradYear: '',
     major: '',
     email: '',
-    password: ''
+    password: '',
+    otp: ''
   });
 
-  const toggleForm = () => setIsSignIn(!isSignIn);
+  // College domain validation
+  const isCollegeEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._-]+@mgit\.ac\.in$/;
+    return emailRegex.test(email);
+  };
+
+  const toggleForm = () => {
+    setIsSignIn(!isSignIn);
+    setShowOtpField(false);
+    setOtpSent(false);
+    setVerificationMessage('');
+  };
+  
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    
+    // Clear verification message when email is changed
+    if (e.target.name === 'email') {
+      setVerificationMessage('');
+      setShowOtpField(false);
+      setOtpSent(false);
+    }
+  };
+
+  const sendOtp = async (e) => {
+    e.preventDefault();
+    
+    // First validate if it's a college email
+    if (!isCollegeEmail(formData.email)) {
+      setVerificationMessage('Please use your college email (@mgit.ac.in)');
+      return;
+    }
+
+    try {
+      // Send OTP to the email
+      const response = await fetch('http://localhost:5000/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setOtpSent(true);
+        setShowOtpField(true);
+        setVerificationMessage('OTP sent to your email. Please verify.');
+      } else {
+        setVerificationMessage(result.msg || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      setVerificationMessage('Server error. Please try again.');
+    }
+  };
+
+  const verifyOtp = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: formData.email,
+          otp: formData.otp 
+        })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setVerificationMessage('Email verified successfully!');
+        return true;
+      } else {
+        setVerificationMessage(result.msg || 'Invalid OTP');
+        return false;
+      }
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      setVerificationMessage('Server error. Please try again.');
+      return false;
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate email format
+    if (!isCollegeEmail(formData.email)) {
+      setVerificationMessage('Please use your college email (@mgit.ac.in)');
+      return;
+    }
+
+    // For sign up, verify OTP first
+    if (!isSignIn) {
+      if (!otpSent) {
+        await sendOtp(e);
+        return;
+      }
+      
+      if (formData.otp.length === 0) {
+        setVerificationMessage('Please enter the OTP sent to your email');
+        return;
+      }
+      
+      const isVerified = await verifyOtp();
+      if (!isVerified) return;
+    }
 
     const endpoint = isSignIn ? "/api/auth/login" : "/api/auth/register";
 
@@ -55,11 +159,11 @@ function A() {
         alert('Login successful!');
         navigate('/home');  // Navigate to home page after successful login
       } else {
-        alert(result.msg || 'Failed!');
+        setVerificationMessage(result.msg || 'Authentication failed!');
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      alert('Server error');
+      setVerificationMessage('Server error. Please try again.');
     }
   };
 
@@ -99,7 +203,47 @@ function A() {
               </>
             )}
 
-            <InputField icon={<Mail size={18} />} placeholder="you@college.edu" name="email" type="email" value={formData.email} onChange={handleChange} />
+            <div className="space-y-1">
+              <InputField 
+                icon={<Mail size={18} />} 
+                placeholder="you@mgit.ac.in" 
+                name="email" 
+                type="email" 
+                value={formData.email} 
+                onChange={handleChange} 
+              />
+              {!isSignIn && (
+                <div className="flex justify-end">
+                 <button
+  type="button"
+  onClick={sendOtp}
+  className="text-sm text-blue-600 hover:underline"
+>
+  {otpSent ? 'Resend OTP' : 'Send OTP'}
+</button>
+                  
+                </div>
+                
+              )}
+            </div>
+
+            {showOtpField && !isSignIn && (
+              <InputField
+                icon={<Check size={18} />}
+                placeholder="Enter OTP"
+                name="otp"
+                type="text"
+                value={formData.otp}
+                onChange={handleChange}
+              />
+            )}
+
+            {verificationMessage && (
+              <div className={`text-sm ${verificationMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                {verificationMessage}
+              </div>
+            )}
+
             <InputField
               icon={<Key size={18} />}
               placeholder="••••••••"
@@ -125,7 +269,7 @@ function A() {
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition"
             >
-              {isSignIn ? 'Sign In' : 'Create Account'}
+              {isSignIn ? 'Sign In' : (otpSent ? 'Create Account' : 'Send OTP & Continue')}
             </button>
           </form>
 
@@ -140,25 +284,6 @@ function A() {
     </div>
   );
 }
-
-/*************  ✨ Windsurf Command ⭐  *************/
-/**
- * A form input field component with a left-side icon, optional right-side icon,
- * and support for password visibility toggling.
- *
- * @param {React.ReactElement} icon - The left-side icon to display.
- * @param {string} placeholder - The input field's placeholder text.
- * @param {string} type - The input field's type (e.g. "text", "password", etc.).
- * @param {string} name - The input field's name.
- * @param {string} value - The input field's current value.
- * @param {function} onChange - The function to call when the input field's value changes.
- * @param {React.ReactElement} [rightIcon] - The right-side icon to display. If provided,
- *                                          the icon will be clickable and will call the
- *                                          `onRightIconClick` function when clicked.
- * @param {function} [onRightIconClick] - The function to call when the right-side icon is clicked.
- *                                        Only called if `rightIcon` is provided.
- */
-/*******  8c2a9532-8f41-4ab0-a3be-5998f5d0a63a  *******/
 
 function InputField({ icon, placeholder, type, name, value, onChange, rightIcon, onRightIconClick }) {
   return (

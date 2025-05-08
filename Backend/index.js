@@ -3,7 +3,7 @@ const connectDB = require("./db");
 const cors = require("cors");
 require("dotenv").config();
 
-
+const crypto = require('crypto');
 const experienceRoutes = require('./routes/experienceRoutes');
 const app = express();
 connectDB();
@@ -11,14 +11,17 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", require("./routes/auth"));
+// Import routes
+const authRoutes = require('./routes/auth');
+
+// Use routes
+app.use('/api/auth', authRoutes);
+
+app.get('/', (req, res) => {
+  res.send('Authentication API is running');
+});
 app.use('/api/experiences', require('./routes/experienceRoutes')); 
-  // Make sure the path is correct
 
-// Middleware setup (if needed)
-
-
-// Define routes
 app.use('/api/experiences', experienceRoutes);
 
 
