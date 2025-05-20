@@ -13,10 +13,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExperienceCard from './ExperienceCard';
 
-
 dayjs.extend(relativeTime);
 
 const MAX_NESTING = 3;
+const API_URL = import.meta.env.VITE_API_URL;
 
 const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
@@ -93,7 +93,7 @@ const HomePage = () => {
       const token = localStorage.getItem('authToken');
       if (!token) return;
       try {
-        const res = await axios.get('http://localhost:5000/api/auth/me', {
+        const res = await axios.get(`${API_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser(res.data);
@@ -112,7 +112,7 @@ const HomePage = () => {
       exps.map(async (exp) => {
         try {
           const res = await axios.get(
-            `http://localhost:5000/api/comments/experience/${exp._id}/count`,
+            `${API_URL}/api/comments/experience/${exp._id}/count`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           counts[exp._id] = res.data.count;
@@ -138,7 +138,7 @@ const HomePage = () => {
         sortOrder
       };
       Object.keys(params).forEach(key => !params[key] && delete params[key]);
-      const response = await axios.get('http://localhost:5000/api/experiences', { params });
+      const response = await axios.get(`${API_URL}/api/experiences`, { params });
       const exps = response.data.experiences;
       if (pageNum === 1) {
         setExperiences(exps);
@@ -196,7 +196,7 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       await axios.post(
-        'http://localhost:5000/api/experiences',
+        `${API_URL}/api/experiences`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -228,7 +228,7 @@ const HomePage = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      await axios.delete(`http://localhost:5000/api/experiences/${id}`, {
+      await axios.delete(`${API_URL}/api/experiences/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -251,7 +251,7 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await axios.post(
-        'http://localhost:5000/api/comments',
+        `${API_URL}/api/comments`,
         {
           experienceId: expId,
           text: text || commentInputs[expId],
@@ -279,7 +279,7 @@ const HomePage = () => {
     const token = localStorage.getItem('authToken');
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/comments/experience/${expId}`,
+        `${API_URL}/api/comments/experience/${expId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setAllComments(prev => ({ ...prev, [expId]: res.data }));
@@ -304,7 +304,7 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       await axios.put(
-        `http://localhost:5000/api/comments/${commentId}`,
+        `${API_URL}/api/comments/${commentId}`,
         { text: editingCommentText },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -318,11 +318,10 @@ const HomePage = () => {
   };
 
   const handleDeleteComment = async (expId, commentId) => {
-    // if (!window.confirm('Delete this comment?')) return;
     try {
       const token = localStorage.getItem('authToken');
       await axios.delete(
-        `http://localhost:5000/api/comments/${commentId}`,
+        `${API_URL}/api/comments/${commentId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await fetchAllComments(expId);
@@ -378,11 +377,10 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await axios.post(
-        `http://localhost:5000/api/experiences/${expId}/upvote`,
+        `${API_URL}/api/experiences/${expId}/upvote`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Update only the voted experience in state
       setExperiences(prev =>
         prev.map(exp =>
           exp._id === expId ? { ...exp, upvotes: res.data.upvotes, downvotes: res.data.downvotes } : exp
@@ -399,7 +397,7 @@ const HomePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await axios.post(
-        `http://localhost:5000/api/experiences/${expId}/downvote`,
+        `${API_URL}/api/experiences/${expId}/downvote`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -589,7 +587,6 @@ const HomePage = () => {
                 handleUpvote={handleUpvote}
                 handleDownvote={handleDownvote}
                 voteLoading={voteLoading[exp._id]}
-                
               />
             ))}
           </div>
@@ -602,32 +599,6 @@ const HomePage = () => {
           </div>
         </div>
       </div>
-
-      
-      {/* {showChat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-6 relative">
-            <button className="absolute top-4 right-4 text-gray-500" onClick={closeChat}>
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-bold mb-4">Chat with {chatUser}</h3>
-            <div className="h-40 bg-gray-100 rounded-lg p-2 mb-4 overflow-y-auto text-sm text-gray-600">
-              <p className="italic">No messages yet...</p>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Type your message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
-                <Send className="w-4 h-4" />
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
 
       {/* Post Form Modal */}
       {showForm && (
@@ -766,7 +737,6 @@ const HomePage = () => {
         </div>
       )}
 
-      
       {isEditing && editFormData && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90vh]">
@@ -780,7 +750,7 @@ const HomePage = () => {
                 try {
                   const token = localStorage.getItem('authToken');
                   await axios.put(
-                    `http://localhost:5000/api/experiences/${editFormData._id}`,
+                    `${API_URL}/api/experiences/${editFormData._id}`,
                     editFormData,
                     {
                       headers: { Authorization: `Bearer ${token}` },

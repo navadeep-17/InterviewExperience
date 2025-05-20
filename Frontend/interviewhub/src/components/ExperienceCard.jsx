@@ -1,7 +1,7 @@
 import { ArrowBigDown, ArrowBigUp, MessageCircle } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom"; // Add this import
 import CommentSection from './CommentSection';
-
+const API_URL = import.meta.env.VITE_API_URL;
 const ExperienceCard = ({
   exp,
   user,
@@ -57,7 +57,7 @@ const ExperienceCard = ({
               exp.user?.avatar
                 ? exp.user.avatar.startsWith('http')
                   ? exp.user.avatar
-                  : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/${exp.user.avatar}`
+                  : `${API_URL}/${exp.user.avatar}`
                 : "https://ui-avatars.com/api/?name=" + encodeURIComponent(exp.user?.name || "U")
             }
             alt={exp.user?.name || "user"}

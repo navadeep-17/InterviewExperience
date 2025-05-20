@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; // <-- Add this import
 import ExperienceCard from "./ExperienceCard";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 // Helper components
 const Input = ({ label, ...props }) => (
   <div>
@@ -89,7 +91,7 @@ const ProfilePage = () => {
       const token = localStorage.getItem("authToken");
       if (!token) return;
       try {
-        const res = await fetch("http://localhost:5000/api/auth/me", {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -108,7 +110,7 @@ const ProfilePage = () => {
       setPostsLoading(true);
       try {
         if (userData._id) {
-          const res = await fetch(`http://localhost:5000/api/experiences/user/${userData._id}`);
+          const res = await fetch(`${API_URL}/api/experiences/user/${userData._id}`);
           if (res.ok) {
             let posts = await res.json();
             // Ensure each post has user info
@@ -134,7 +136,7 @@ const ProfilePage = () => {
       const counts = {};
       for (const post of userPosts) {
         try {
-          const res = await fetch(`http://localhost:5000/api/comments/experience/${post._id}`);
+          const res = await fetch(`${API_URL}/api/comments/experience/${post._id}`);
           if (res.ok) {
             const comments = await res.json();
             all[post._id] = comments;
@@ -163,7 +165,7 @@ const ProfilePage = () => {
     setSubmitting(true);
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch("http://localhost:5000/api/auth/me", {
+      const res = await fetch(`${API_URL}/api/auth/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -213,7 +215,7 @@ const ProfilePage = () => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`http://localhost:5000/api/experiences/${id}`, {
+      const res = await fetch(`${API_URL}/api/experiences/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -244,7 +246,7 @@ const ProfilePage = () => {
   const fetchComments = async (postId) => {
     setCommentLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/experience/${postId}`);
+      const res = await fetch(`${API_URL}/api/comments/experience/${postId}`);
       if (res.ok) {
         const comments = await res.json();
         setAllComments((prev) => ({
@@ -274,7 +276,7 @@ const ProfilePage = () => {
       const body = parentId
         ? { text, experienceId: postId, parentCommentId: parentId }
         : { text, experienceId: postId };
-      const res = await fetch(`http://localhost:5000/api/comments`, {
+      const res = await fetch(`${API_URL}/api/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -302,7 +304,7 @@ const ProfilePage = () => {
     setCommentLoading(true);
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -325,7 +327,7 @@ const ProfilePage = () => {
     const token = localStorage.getItem("authToken");
     setCommentLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -343,7 +345,7 @@ const ProfilePage = () => {
     setCommentLoading(true);
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`http://localhost:5000/api/comments`, {
+      const res = await fetch(`${API_URL}/api/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -385,7 +387,7 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `http://localhost:5000/api/experiences/${expId}/upvote`,
+        `${API_URL}/api/experiences/${expId}/upvote`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` }
@@ -410,7 +412,7 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem('authToken');
       const res = await fetch(
-        `http://localhost:5000/api/experiences/${expId}/downvote`,
+        `${API_URL}/api/experiences/${expId}/downvote`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` }
@@ -616,7 +618,7 @@ const ProfilePage = () => {
                 try {
                   const token = localStorage.getItem('authToken');
                   const res = await fetch(
-                    `http://localhost:5000/api/experiences/${editFormData._id}`,
+                    `${API_URL}/api/experiences/${editFormData._id}`,
                     {
                       method: "PUT",
                       headers: {
