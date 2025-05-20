@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Comment = require('../models/comment');
+const Comment = require('../models/Comment');
 const { authMiddleware } = require('../middleware/authMiddleware');
 
 // POST: Add a comment to an experience
