@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+/* Add this to your global CSS file */
+@media (max-width: 640px) {
+  .comment-thread-container {
+    font-size: 0.97em;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    border-radius: 6px !important;
+  }
+  .comment-thread-container .truncate {
+    max-width: 90px !important;
+  }
+}

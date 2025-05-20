@@ -1,281 +1,331 @@
-import React, { useState } from 'react';
-import { Book, Calendar, Check, Eye, EyeOff, Key, Mail, User } from 'react-feather';
-import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-function A() {
+function AuthForm() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [showOtpField, setShowOtpField] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState('');
-  const navigate = useNavigate();
-
   const [formData, setFormData] = useState({
     fullName: '',
     gradYear: '',
     major: '',
     email: '',
-    password: '',
-    otp: ''
+    password: ''
   });
+  const [message, setMessage] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState('login'); // 'login' | 'otp'
+  const [resetStep, setResetStep] = useState('email'); // 'email' | 'otp'
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetMsg, setResetMsg] = useState('');
+  const [showReset, setShowReset] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // College domain validation
-  const isCollegeEmail = (email) => {
-    const emailRegex = /^[a-zA-Z0-9._-]+@mgit\.ac\.in$/;
-    return emailRegex.test(email);
-  };
+  useEffect(() => {
+    const authToken = localStorage.getItem('authToken');
+    if (authToken && location.pathname !== '/home') {
+      navigate('/home');
+    }
+  }, [navigate, location.pathname]);
+
+  const isCollegeEmail = (email) => /^[a-zA-Z0-9._-]+@mgit\.ac\.in$/.test(email);
 
   const toggleForm = () => {
     setIsSignIn(!isSignIn);
-    setShowOtpField(false);
-    setOtpSent(false);
-    setVerificationMessage('');
+    setMessage('');
   };
-  
+
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    
-    // Clear verification message when email is changed
-    if (e.target.name === 'email') {
-      setVerificationMessage('');
-      setShowOtpField(false);
-      setOtpSent(false);
-    }
-  };
-
-  const sendOtp = async (e) => {
-    e.preventDefault();
-    
-    // First validate if it's a college email
-    if (!isCollegeEmail(formData.email)) {
-      setVerificationMessage('Please use your college email (@mgit.ac.in)');
-      return;
-    }
-
-    try {
-      // Send OTP to the email
-      const response = await fetch('http://localhost:5000/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email })
-      });
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        setOtpSent(true);
-        setShowOtpField(true);
-        setVerificationMessage('OTP sent to your email. Please verify.');
-      } else {
-        setVerificationMessage(result.msg || 'Failed to send OTP');
-      }
-    } catch (error) {
-      console.error("Error sending OTP:", error);
-      setVerificationMessage('Server error. Please try again.');
-    }
-  };
-
-  const verifyOtp = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: formData.email,
-          otp: formData.otp 
-        })
-      });
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        setVerificationMessage('Email verified successfully!');
-        return true;
-      } else {
-        setVerificationMessage(result.msg || 'Invalid OTP');
-        return false;
-      }
-    } catch (error) {
-      console.error("Error verifying OTP:", error);
-      setVerificationMessage('Server error. Please try again.');
-      return false;
-    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate email format
     if (!isCollegeEmail(formData.email)) {
-      setVerificationMessage('Please use your college email (@mgit.ac.in)');
+      setMessage('Please use your college email (@mgit.ac.in)');
       return;
     }
 
-    // For sign up, verify OTP first
-    if (!isSignIn) {
-      if (!otpSent) {
-        await sendOtp(e);
-        return;
+    if (isSignIn) {
+      // Direct login (no OTP)
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      });
+      const result = await response.json();
+      console.log(result);
+      if (response.ok && result.token && result.user) {
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        navigate('/home');
+      } else {
+        setMessage(result.message || 'Authentication failed!');
       }
-      
-      if (formData.otp.length === 0) {
-        setVerificationMessage('Please enter the OTP sent to your email');
-        return;
-      }
-      
-      const isVerified = await verifyOtp();
-      if (!isVerified) return;
-    }
-
-    const endpoint = isSignIn ? "/api/auth/login" : "/api/auth/register";
-
-    // Prepare payload based on form mode
-    const payload = isSignIn
-      ? {
-          email: formData.email,
-          password: formData.password
-        }
-      : {
+    } else {
+      // Registration with OTP
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: formData.fullName,
           email: formData.email,
           password: formData.password,
           graduationYear: formData.gradYear,
-          department: formData.major
-        };
-
-    try {
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+          department: formData.major,
+          context: 'welcome'
+        })
       });
-
       const result = await response.json();
-      console.log("Server response:", result);
-
       if (response.ok) {
-        alert('Login successful!');
-        navigate('/home');  // Navigate to home page after successful login
+        setStep('otp');
+        setMessage('OTP sent to your email. Please verify.');
       } else {
-        setVerificationMessage(result.msg || 'Authentication failed!');
+        setMessage(result.msg || result.message || 'Registration failed!');
       }
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      setVerificationMessage('Server error. Please try again.');
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12">
-      <div className="max-w-4xl w-full flex flex-col md:flex-row rounded-2xl shadow-xl overflow-hidden bg-white">
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    const response = await fetch('http://localhost:5000/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: formData.email, otp,context: 'reset' }),
+    });
+    const result = await response.json();
+    if (response.ok && result.token && result.user) {
+      localStorage.setItem('authToken', result.token);
+      localStorage.setItem('user', JSON.stringify(result.user));
+      alert('Login successful!');
+      navigate('/home');
+    } else {
+      setMessage(result.message || 'OTP verification failed!');
+    }
+  };
 
-        {/* Auth form */}
-        <div className="md:w-1/2 p-8">
-          <div className="flex justify-center mb-8">
-            <div className="flex bg-gray-100 rounded-full overflow-hidden w-full max-w-xs">
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    if (resetStep === 'email') {
+      // Step 1: Send OTP
+      const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResetStep('otp');
+        setResetMsg('OTP sent to your email.');
+      } else {
+        setResetMsg(data.message || 'Failed to send OTP');
+      }
+    } else {
+      // Step 2: Verify OTP and set new password
+      const res = await fetch('http://localhost:5000/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, otp: resetOtp, newPassword: resetNewPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResetMsg('Password reset successful! You can now log in.');
+        setTimeout(() => {
+          setShowReset(false);
+          setResetStep('email');
+          setResetEmail('');
+          setResetOtp('');
+          setResetNewPassword('');
+          setResetMsg('');
+        }, 2000);
+      } else {
+        setResetMsg(data.message || 'Failed to reset password');
+      }
+    }
+  };
+
+  const departmentOptions = [
+    "CSE", "ECE", "MECH", "CIVIL", "EEE", "IT", "CSB", "CSD", "CSM"
+  ];
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 px-4 py-12">
+      <div className="max-w-4xl w-full flex flex-col md:flex-row rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100">
+        <div className="md:w-1/2 p-10 flex flex-col justify-center">
+          <div className="flex justify-center mb-10">
+            <div className="flex bg-gray-100 rounded-full overflow-hidden w-full max-w-xs shadow">
               <button
-                className={`w-1/2 py-2 text-sm font-semibold ${!isSignIn ? 'text-gray-700' : 'bg-blue-600 text-white'}`}
+                className={`w-1/2 py-2 text-base font-bold transition-all duration-200 ${
+                  isSignIn
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-gray-700 hover:bg-blue-50'
+                }`}
                 onClick={() => setIsSignIn(true)}
+                type="button"
               >
                 Sign In
               </button>
               <button
-                className={`w-1/2 py-2 text-sm font-semibold ${isSignIn ? 'text-gray-700' : 'bg-blue-600 text-white'}`}
+                className={`w-1/2 py-2 text-base font-bold transition-all duration-200 ${
+                  !isSignIn
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-gray-700 hover:bg-blue-50'
+                }`}
                 onClick={() => setIsSignIn(false)}
+                type="button"
               >
                 Sign Up
               </button>
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
-            {isSignIn ? 'Welcome back!' : 'Create your account'}
+          <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">
+            {isSignIn ? 'Welcome Back!' : 'Create Your Account'}
           </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isSignIn && (
-              <>
-                <InputField icon={<User size={18} />} placeholder="Full Name" name="fullName" type="text" value={formData.fullName} onChange={handleChange} />
-                <InputField icon={<Calendar size={18} />} placeholder="Graduation Year" name="gradYear" type="text" value={formData.gradYear} onChange={handleChange} />
-                <InputField icon={<Book size={18} />} placeholder="Major/Department" name="major" type="text" value={formData.major} onChange={handleChange} />
-              </>
-            )}
+          {step === 'otp' ? (
+            <form onSubmit={handleOtpSubmit} className="space-y-6">
+              <InputField
+                placeholder="Enter OTP"
+                name="otp"
+                type="text"
+                value={otp}
+                onChange={e => setOtp(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition"
+              >
+                Verify OTP
+              </button>
+              {message && (
+                <div className="text-center text-base font-medium text-red-600 mt-2">{message}</div>
+              )}
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {!isSignIn && (
+                <>
+                  <InputField placeholder="Full Name" name="fullName" type="text" value={formData.fullName} onChange={handleChange} />
+                  <InputField placeholder="Graduation Year" name="gradYear" type="text" value={formData.gradYear} onChange={handleChange} />
+                  <div className="relative">
+                    <select
+                      name="major"
+                      value={formData.major}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required // <-- This makes the department compulsory
+                    >
+                      <option value="" disabled>Select Department</option>
+                      {departmentOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
-            <div className="space-y-1">
               <InputField 
-                icon={<Mail size={18} />} 
                 placeholder="you@mgit.ac.in" 
                 name="email" 
                 type="email" 
                 value={formData.email} 
                 onChange={handleChange} 
               />
-              {!isSignIn && (
-                <div className="flex justify-end">
-                 <button
-  type="button"
-  onClick={sendOtp}
-  className="text-sm text-blue-600 hover:underline"
->
-  {otpSent ? 'Resend OTP' : 'Send OTP'}
-</button>
-                  
-                </div>
-                
-              )}
-            </div>
 
-            {showOtpField && !isSignIn && (
               <InputField
-                icon={<Check size={18} />}
-                placeholder="Enter OTP"
-                name="otp"
-                type="text"
-                value={formData.otp}
+                placeholder="••••••••"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
                 onChange={handleChange}
+                rightIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                onRightIconClick={togglePasswordVisibility}
               />
-            )}
 
-            {verificationMessage && (
-              <div className={`text-sm ${verificationMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
-                {verificationMessage}
-              </div>
-            )}
+              {message && (
+                <div className={`text-center text-base font-medium mt-2 ${message.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                  {message}
+                </div>
+              )}
 
-            <InputField
-              icon={<Key size={18} />}
-              placeholder="••••••••"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={handleChange}
-              rightIcon={showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              onRightIconClick={togglePasswordVisibility}
-            />
+              {isSignIn && (
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <label className="flex items-center gap-2 text-gray-700">
+                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
+                    Remember me
+                  </label>
+                  <span className="text-blue-600 hover:underline cursor-pointer font-semibold" onClick={() => setShowReset(true)}>
+                    Forgot password?
+                  </span>
+                </div>
+              )}
 
-            {isSignIn && (
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 text-gray-700">
-                  <input type="checkbox" className="h-4 w-4" />
-                  Remember me
-                </label>
-                <span className="text-blue-600 hover:underline cursor-pointer">Forgot password?</span>
-              </div>
-            )}
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition"
+              >
+                {isSignIn ? 'Sign In' : 'Create Account'}
+              </button>
+            </form>
+          )}
 
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition"
-            >
-              {isSignIn ? 'Sign In' : (otpSent ? 'Create Account' : 'Send OTP & Continue')}
-            </button>
-          </form>
+          {showReset && (
+            <div className="mt-10 p-6 bg-gray-50 rounded-2xl shadow-lg border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">
+                {resetStep === 'email' ? 'Reset Password' : 'Verify OTP'}
+              </h3>
+              <form onSubmit={handleResetSubmit} className="space-y-4">
+                {resetStep === 'email' ? (
+                  <InputField
+                    placeholder="you@mgit.ac.in"
+                    name="resetEmail"
+                    type="email"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                  />
+                ) : (
+                  <>
+                    <InputField
+                      placeholder="Enter OTP"
+                      name="resetOtp"
+                      type="text"
+                      value={resetOtp}
+                      onChange={e => setResetOtp(e.target.value)}
+                    />
+                    <InputField
+                      placeholder="New Password"
+                      name="resetNewPassword"
+                      type="password"
+                      value={resetNewPassword}
+                      onChange={e => setResetNewPassword(e.target.value)}
+                    />
+                  </>
+                )}
 
-          <p className="text-sm text-center text-gray-600 mt-6">
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition"
+                >
+                  {resetStep === 'email' ? 'Send OTP' : 'Reset Password'}
+                </button>
+
+                {resetMsg && (
+                  <div className="text-center text-base font-medium text-red-600 mt-2">{resetMsg}</div>
+                )}
+              </form>
+            </div>
+          )}
+
+          <p className="text-base text-center text-gray-600 mt-8">
             {isSignIn ? "Don't have an account?" : "Already have an account?"}{' '}
-            <span className="text-blue-600 cursor-pointer hover:underline" onClick={toggleForm}>
+            <span className="text-blue-600 cursor-pointer hover:underline font-semibold" onClick={toggleForm}>
               {isSignIn ? 'Sign Up' : 'Sign In'}
             </span>
           </p>
@@ -285,18 +335,15 @@ function A() {
   );
 }
 
-function InputField({ icon, placeholder, type, name, value, onChange, rightIcon, onRightIconClick }) {
+function InputField({ placeholder, type, name, value, onChange, rightIcon, onRightIconClick }) {
   return (
     <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-        {icon}
-      </div>
       <input
         type={type}
         name={name}
         value={value}
         onChange={onChange}
-        className="pl-10 pr-10 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         placeholder={placeholder}
         required
       />
@@ -312,4 +359,4 @@ function InputField({ icon, placeholder, type, name, value, onChange, rightIcon,
   );
 }
 
-export default A;
+export default AuthForm;

@@ -1,194 +1,281 @@
-require('dotenv').config(); // Load .env variables at the top
-
+// routes/auth.js
 const express = require('express');
-const router = express.Router();
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const { authMiddleware } = require('../middleware/authMiddleware');
+const Message = require('../models/Message');
 const nodemailer = require('nodemailer');
-const fs = require('fs');
-const path = require('path');
-const rateLimit = require('express-rate-limit');
+const Group = require('../models/Group'); // Add at the top
+const router = express.Router();
 
-// Path to OTP storage file
-const dataDir = path.join(__dirname, '../data');
-const OTP_FILE = path.join(dataDir, 'otp-store.json');
+// Generate JWT
+const generateToken = (user) => {
+  const payload = { _id: user._id, email: user.email, name: user.name };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '12h' });
+};
 
-// Ensure the data directory exists
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+// Sign Up - User Registration
+router.post('/register', async (req, res) => {
+  const { name, email, password, graduationYear, department, context } = req.body;
 
-// Initialize or load OTP store
-let otpStore = {};
-try {
-  if (fs.existsSync(OTP_FILE)) {
-    const data = fs.readFileSync(OTP_FILE, 'utf8');
-    otpStore = JSON.parse(data);
-    console.log('Loaded OTP store from file');
-  } else {
-    fs.writeFileSync(OTP_FILE, JSON.stringify({}));
-    console.log('Created new OTP store file');
-  }
-} catch (error) {
-  console.error('Error initializing OTP store:', error);
-  otpStore = {};
-}
-
-// Save OTP store to file
-function saveOtpStore() {
   try {
-    fs.writeFileSync(OTP_FILE, JSON.stringify(otpStore));
-    console.log('OTP store saved to file');
-  } catch (error) {
-    console.error('Error saving OTP store:', error);
-  }
-}
+    const userExists = await User.findOne({ email });
+    if (userExists) return res.status(400).json({ message: 'Email already in use' });
 
-// Load OTP store from file
-function loadOtpStore() {
-  try {
-    if (fs.existsSync(OTP_FILE)) {
-      const data = fs.readFileSync(OTP_FILE, 'utf8');
-      otpStore = JSON.parse(data);
-      console.log('OTP store reloaded from file');
-    }
-  } catch (error) {
-    console.error('Error loading OTP store:', error);
-    otpStore = {};
-  }
-}
+    const user = new User({
+      name,
+      email,
+      password,
+      graduationYear,
+      department,
+      isVerified: false
+    });
+    await user.save();
 
-// Remove expired OTPs
-function cleanupExpiredOtps() {
-  const now = Date.now();
-  let changed = false;
-
-  Object.keys(otpStore).forEach(email => {
-    if (otpStore[email].expiresAt < now) {
-      console.log(`Removing expired OTP for ${email}`);
-      delete otpStore[email];
-      changed = true;
-    }
-  });
-
-  if (changed) saveOtpStore();
-}
-
-// Run cleanup every minute
-setInterval(cleanupExpiredOtps, 60 * 1000);
-
-// Rate limiter for OTP requests
-const otpLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 3,
-  message: 'Too many OTP requests. Please try again later.'
-});
-
-// Email configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-// Validate MGIT email
-function isValidCollegeEmail(email) {
-  const emailRegex = /^[a-zA-Z0-9._-]+@mgit\.ac\.in$/;
-  return emailRegex.test(email);
-}
-
-// Generate 6-digit OTP
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Route: Send OTP
-router.post('/send-otp', otpLimiter, async (req, res) => {
-  try {
-    const { email } = req.body;
-    console.log('Received OTP request for:', email);
-
-    if (!isValidCollegeEmail(email)) {
-      return res.status(400).json({ success: false, msg: 'Please use your college email (@mgit.ac.in)' });
+    // Add user to their department group
+    const group = await Group.findOne({ name: department });
+    if (group && !group.members.includes(user._id)) {
+      group.members.push(user._id);
+      await group.save();
     }
 
-    const otp = generateOTP();
-    console.log(`Generated OTP for ${email}: ${otp}`);
+    // Generate OTP and send email
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = Date.now() + 5 * 60 * 1000;
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
 
-    otpStore[email] = {
-      otp,
-      expiresAt: Date.now() + 10 * 60 * 1000
-    };
+    // Send OTP via email with context
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-    saveOtpStore();
+    let messageText = `Your OTP code is ${otp}`;
+    if (context === 'welcome') {
+      messageText = `Welcome to InterviewHub!\nYour OTP for registration is: ${otp}`;
+    }
 
-    const mailOptions = {
+    await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Your OTP for MGIT Student Portal',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #3b82f6;">MGIT Student Portal</h2>
-          <p>Your One-Time Password (OTP) is:</p>
-          <h1 style="background-color: #f3f4f6; padding: 10px; text-align: center; font-size: 32px; letter-spacing: 5px;">
-            ${otp}
-          </h1>
-          <p>This OTP is valid for 10 minutes.</p>
-        </div>
-      `
-    };
+      subject: 'Your OTP Code',
+      text: messageText,
+    });
 
-    await transporter.sendMail(mailOptions);
-    console.log('Email sent to:', email);
-
-    res.status(200).json({ success: true, msg: 'OTP sent successfully' });
-  } catch (err) {
-    console.error('Error in /send-otp:', err);
-    res.status(500).json({ success: false, msg: 'Failed to send OTP' });
+    res.status(201).json({ message: 'Registration successful. Please verify your email.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 });
 
-// Route: Verify OTP
-router.post('/verify-otp', (req, res) => {
+// Login - User Authentication
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
   try {
-    loadOtpStore();
-
-    const { email, otp } = req.body;
-    console.log('Verifying OTP:', { email, otp });
-
-    if (!otpStore[email]) {
-      return res.status(400).json({ success: false, msg: 'OTP not found or expired. Please request a new one.' });
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log('No user found for email:', email);
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const stored = otpStore[email];
-
-    if (Date.now() > stored.expiresAt) {
-      delete otpStore[email];
-      saveOtpStore();
-      return res.status(400).json({ success: false, msg: 'OTP has expired. Please request a new one.' });
+    if (!user.isVerified) {
+      console.log('User not verified:', email);
+      return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
-    if (stored.otp !== otp) {
-      return res.status(400).json({ success: false, msg: 'Invalid OTP. Please try again.' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('Password mismatch for user:', email);
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    delete otpStore[email];
-    saveOtpStore();
-    console.log('OTP verified successfully');
+    const token = generateToken(user);
 
-    res.status(200).json({ success: true, msg: 'Email verified successfully' });
-  } catch (err) {
-    console.error('Error in /verify-otp:', err);
-    res.status(500).json({ success: false, msg: 'Server error. Try again later.' });
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Debug route for development
-router.get('/debug-otp-store', (req, res) => {
-  if (process.env.NODE_ENV === 'development') {
-    return res.json({ otpStore });
+// Update current user's profile
+router.put('/me', authMiddleware, async (req, res) => {
+  try {
+    const updates = req.body;
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Profile update failed', error: error.message });
   }
-  return res.status(403).json({ msg: 'Forbidden' });
+});
+
+// Get current user's profile
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get all users except the current user
+router.get('/all', authMiddleware, async (req, res) => {
+  try {
+    const users = await User.find({ _id: { $ne: req.user._id } }).select('-password');
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
+// Get message history between two users
+router.get('/messages/:userId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const otherUserId = req.params.userId;
+    const messages = await Message.find({
+      $or: [
+        { senderId: userId, recipientId: otherUserId },
+        { senderId: otherUserId, recipientId: userId }
+      ]
+    }).sort('timestamp');
+    res.json({ messages }); // <-- FIXED
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch messages' });
+  }
+});
+
+// Send OTP (general purpose)
+router.post('/send-otp', async (req, res) => {
+  const { email, context } = req.body;
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+  const user = await User.findOneAndUpdate({ email }, { otp, otpExpiry });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // Send OTP via email with context
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  let messageText = `Your OTP code is ${otp}`;
+  if (context === 'welcome') {
+    messageText = `Welcome to CarerStories!\nYour OTP for registration is: ${otp}\nThis OTP is valid for 10 minutes.\nDo not share it with anyone.`;
+  } else if (context === 'reset') {
+    messageText = `Your OTP to reset your password is: ${otp}`;
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'CarerStories - Register OTP',
+    text: messageText,
+  });
+
+  res.json({ message: 'OTP sent' });
+});
+
+// Verify OTP
+router.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || user.otp !== otp || Date.now() > user.otpExpiry) {
+    return res.status(400).json({ message: 'Invalid or expired OTP' });
+  }
+  user.otp = undefined;
+  user.otpExpiry = undefined;
+  user.isVerified = true;
+  await user.save();
+
+  // Generate JWT and return user info
+  const token = generateToken(user);
+  res.json({ token, user });
+});
+
+// Request password reset (send OTP)
+router.post('/forgot-password', async (req, res) => {
+  const { email, context } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = Date.now() + 5 * 60 * 1000;
+  user.otp = otp;
+  user.otpExpiry = otpExpiry;
+  await user.save();
+
+  // Send OTP via email with context
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  let messageText = `CareerStories password reset OTP: ${otp}. This one-time code is valid for 10 minutes. Do not share it with anyone.`;
+  if (context === 'reset') {
+    messageText = `CareerStories password reset OTP: ${otp}. This one-time code is valid for 10 minutes. Do not share it with anyone.`;
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'CareerStories: Password Reset OTP',
+    text: messageText,
+  });
+
+  res.json({ message: 'OTP sent to your email.' });
+});
+
+// Reset password
+router.post('/reset-password', async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || user.otp !== otp || Date.now() > user.otpExpiry) {
+    return res.status(400).json({ message: 'Invalid or expired OTP' });
+  }
+  if (!user.isVerified) {
+    return res.status(403).json({ message: 'Please verify your email before resetting password.' });
+  }
+  user.password = newPassword; // Don't hash here!
+  user.otp = undefined;
+  user.otpExpiry = undefined;
+  await user.save();
+  res.json({ message: 'Password reset successful. You can now log in.' });
+});
+
+// Delete a message
+router.delete('/messages/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    await Message.findByIdAndDelete(messageId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete message' });
+  }
 });
 
 module.exports = router;
