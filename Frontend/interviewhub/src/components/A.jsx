@@ -2,6 +2,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL;
 function AuthForm() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -54,7 +55,7 @@ function AuthForm() {
 
     if (isSignIn) {
       // Direct login (no OTP)
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, password: formData.password }),
@@ -70,7 +71,7 @@ function AuthForm() {
       }
     } else {
       // Registration with OTP
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,7 +95,7 @@ function AuthForm() {
 
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch('http://localhost:5000/api/auth/verify-otp', {
+    const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: formData.email, otp,context: 'reset' }),
@@ -114,7 +115,7 @@ function AuthForm() {
     e.preventDefault();
     if (resetStep === 'email') {
       // Step 1: Send OTP
-      const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
+      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resetEmail }),
@@ -128,7 +129,7 @@ function AuthForm() {
       }
     } else {
       // Step 2: Verify OTP and set new password
-      const res = await fetch('http://localhost:5000/api/auth/reset-password', {
+      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resetEmail, otp: resetOtp, newPassword: resetNewPassword }),

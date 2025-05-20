@@ -2,7 +2,7 @@ import { MessageCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom"; // <-- updated import
 import ExperienceCard from "./ExperienceCard";
-
+const API_URL = import.meta.env.VITE_API_URL;
 const PublicUserProfile = () => {
   const { id } = useParams();
   const [userInfo, setUserInfo] = useState(null);
@@ -62,11 +62,11 @@ const PublicUserProfile = () => {
       setLoading(true);
       try {
         // Fetch user info
-        const userRes = await fetch(`http://localhost:5000/api/users/${id}`);
+        const userRes = await fetch(`${API_URL}/api/users/${id}`);
         const userData = await userRes.json();
 
         // Fetch user's experiences
-        const expRes = await fetch(`http://localhost:5000/api/experiences/user/${id}`);
+        const expRes = await fetch(`${API_URL}/api/experiences/user/${id}`);
         let expData = await expRes.json();
         expData = expData.map(exp => ({ ...exp, user: userData }));
 
@@ -77,7 +77,7 @@ const PublicUserProfile = () => {
         const commentsObj = {};
         const countsObj = {};
         for (const exp of expData) {
-          const res = await fetch(`http://localhost:5000/api/comments/experience/${exp._id}`);
+          const res = await fetch(`${API_URL}/api/comments/experience/${exp._id}`);
           const comments = await res.json();
           commentsObj[exp._id] = comments;
           countsObj[exp._id] = comments.length;
@@ -98,7 +98,7 @@ const PublicUserProfile = () => {
   const fetchComments = async (expId) => {
     setCommentLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/experience/${expId}`);
+      const res = await fetch(`${API_URL}/api/comments/experience/${expId}`);
       if (res.ok) {
         const comments = await res.json();
         setAllComments((prev) => ({
@@ -123,7 +123,7 @@ const PublicUserProfile = () => {
       const body = parentId
         ? { text, experienceId: expId, parentCommentId: parentId }
         : { text, experienceId: expId };
-      const res = await fetch(`http://localhost:5000/api/comments`, {
+      const res = await fetch(`${API_URL}/api/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,7 +150,7 @@ const PublicUserProfile = () => {
     setCommentLoading(true);
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -172,7 +172,7 @@ const PublicUserProfile = () => {
     const token = localStorage.getItem("authToken");
     setCommentLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -189,7 +189,7 @@ const PublicUserProfile = () => {
     setCommentLoading(true);
     const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`http://localhost:5000/api/comments`, {
+      const res = await fetch(`${API_URL}/api/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -210,7 +210,7 @@ const PublicUserProfile = () => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
     const token = localStorage.getItem('authToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/experiences/${expId}/upvote`, {
+      const res = await fetch(`${API_URL}/api/experiences/${expId}/upvote`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -232,7 +232,7 @@ const PublicUserProfile = () => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
     const token = localStorage.getItem('authToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/experiences/${expId}/downvote`, {
+      const res = await fetch(`${API_URL}/api/experiences/${expId}/downvote`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
