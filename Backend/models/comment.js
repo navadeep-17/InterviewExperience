@@ -22,5 +22,8 @@ const commentSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+
+
+
 // Prevent OverwriteModelError
 module.exports = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
