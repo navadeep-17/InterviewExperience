@@ -92,8 +92,11 @@ const MessageComponent = () => {
     fetch(`${API_URL}/api/groups`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
     })
-      .then(res => res.json())
-      .then(data => setGroups(data))
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch groups');
+        return res.json();
+      })
+      .then(data => { if (Array.isArray(data)) setGroups(data); })
       .catch(() => setGroups([]));
   }, [currentUser?._id]);
 
@@ -203,18 +206,22 @@ const MessageComponent = () => {
 
   // Paginated fetch for messages
   useEffect(() => {
+    let cancelled = false;
     if (selectedUser) {
       setLoadingMore(true);
-      fetch(`${API_URL}/api/auth/messages/${selectedUser._id}?page=${page}&limit=20`, {
+      fetch(`${API_URL}/api/messages/${selectedUser._id}?page=${page}&limit=20`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch messages');
+          return res.json();
+        })
         .then(data => {
-          const newMsgs = Array.isArray(data.messages)
-            ? data.messages
-            : Array.isArray(data)
-              ? data
-              : [];
+          if (cancelled) return;
+          if (!Array.isArray(data?.messages) || typeof data.hasMore !== 'boolean') {
+            throw new Error('Invalid conversation response');
+          }
+          const newMsgs = data.messages;
           setMessages(prev => {
             const prevMsgs = prev[selectedUser._id] || [];
             const allMsgs = page === 1 ? newMsgs : [...newMsgs, ...prevMsgs];
@@ -225,35 +232,39 @@ const MessageComponent = () => {
               [selectedUser._id]: uniqueMsgs
             };
           });
-          setHasMore(data.hasMore !== undefined ? data.hasMore : false);
-          setLoadingMore(false);
-        });
+          setHasMore(data.hasMore);
+        })
+        .catch(() => { /* Preserve already loaded messages on failed requests. */ })
+        .finally(() => { if (!cancelled) setLoadingMore(false); });
     }
+    return () => { cancelled = true; };
   }, [selectedUser, page]);
 
   // Fetch group messages when a group is selected
   useEffect(() => {
+    let cancelled = false;
     if (selectedGroup) {
       setGroupMessages([]); // Clear messages when switching group
       setLoadingMore(true);
       fetch(`${API_URL}/api/groups/${selectedGroup._id}/messages`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
       })
-        .then(res => res.json())
-        .then(data => {
-          setGroupMessages(Array.isArray(data) ? data : []);
-          setLoadingMore(false);
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch group messages');
+          return res.json();
         })
-        .catch(() => {
-          setGroupMessages([]);
-          setLoadingMore(false);
-        });
+        .then(data => {
+          if (!cancelled && Array.isArray(data)) setGroupMessages(data);
+        })
+        .catch(() => { /* Failed responses must not replace message data. */ })
+        .finally(() => { if (!cancelled) setLoadingMore(false); });
     }
+    return () => { cancelled = true; };
   }, [selectedGroup]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && (!selectedUser || page === 1)) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedUser, selectedGroup, currentMessages, groupMessages]);
@@ -281,10 +292,16 @@ const MessageComponent = () => {
     if (selectedUser) {
       fetch(`${API_URL}/api/messages/markAsRead`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderId: selectedUser._id, recipientId: currentUser._id })
-      });
-      setUnreadCounts(prev => ({ ...prev, [selectedUser._id]: 0 }));
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({ senderId: selectedUser._id })
+      })
+        .then(res => {
+          if (res.ok) setUnreadCounts(prev => ({ ...prev, [selectedUser._id]: 0 }));
+        })
+        .catch(() => { /* Keep unread state when the request fails. */ });
     }
   }, [selectedUser]);
 
@@ -306,13 +323,13 @@ const MessageComponent = () => {
   }, [selectedUser]);
 
   const handleDeleteMessage = async (messageId) => {
-    await fetch(`${API_URL}/api/auth/messages/${messageId}`, {
+    const response = await fetch(`${API_URL}/api/messages/${messageId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }
-    });
-    if (selectedUser) {
+    }).catch(() => null);
+    if (response?.ok && selectedUser) {
       setMessages(prev => ({
         ...prev,
         [selectedUser._id]: (prev[selectedUser._id] || []).filter(msg => msg._id !== messageId)
@@ -321,13 +338,13 @@ const MessageComponent = () => {
   };
 
   const handleDeleteGroupMessage = async (messageId) => {
-    await fetch(`${API_URL}/api/groups/messages/${messageId}`, {
+    const response = await fetch(`${API_URL}/api/groups/messages/${messageId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('authToken')}`
       }
-    });
-    setGroupMessages(prev => prev.filter(msg => msg._id !== messageId));
+    }).catch(() => null);
+    if (response?.ok) setGroupMessages(prev => prev.filter(msg => msg._id !== messageId));
   };
 
   // Add this helper for avatar rendering

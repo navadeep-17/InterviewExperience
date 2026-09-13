@@ -9,7 +9,6 @@ const corsOptions = {
   credentials: true,
 };
 const mongoose = require("mongoose");
-const Message = require('./models/Message');
 const Group = require('./models/Group');
 const { configureRealtime } = require('./socket/realtime');
 
@@ -89,19 +88,6 @@ const io = require('socket.io')(http, { cors: corsOptions });
 app.set('io', io);
 
 configureRealtime(io);
-
-app.post('/api/messages/markAsRead', async (req, res) => {
-  try {
-    const { senderId, recipientId } = req.body;
-    await Message.updateMany(
-      { senderId, recipientId, isRead: false },
-      { $set: { isRead: true } }
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to mark messages as read', error: err.message });
-  }
-});
 
 // Start the server
 http.listen(process.env.PORT || 5000, () => {

@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { authMiddleware } = require('../middleware/authMiddleware');
-const Message = require('../models/Message');
 const nodemailer = require('nodemailer');
 const Group = require('../models/Group'); // Add at the top
 const {
@@ -165,23 +164,6 @@ router.get('/all', authMiddleware, async (req, res) => {
   }
 });
 
-// Get message history between two users
-router.get('/messages/:userId', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const otherUserId = req.params.userId;
-    const messages = await Message.find({
-      $or: [
-        { senderId: userId, recipientId: otherUserId },
-        { senderId: otherUserId, recipientId: userId }
-      ]
-    }).sort('timestamp');
-    res.json({ messages }); // <-- FIXED
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch messages' });
-  }
-});
-
 // Send OTP (general purpose)
 router.post('/send-otp', requireCollegeEmail, async (req, res) => {
   const { email, context } = req.body;
@@ -285,17 +267,6 @@ router.post('/reset-password', requireCollegeEmail, async (req, res) => {
   user.otpExpiry = undefined;
   await user.save();
   res.json({ message: 'Password reset successful. You can now log in.' });
-});
-
-// Delete a message
-router.delete('/messages/:messageId', async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    await Message.findByIdAndDelete(messageId);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete message' });
-  }
 });
 
 // Express 5 forwards rejected async handlers here. Never expose provider,
