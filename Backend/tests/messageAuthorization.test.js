@@ -22,20 +22,28 @@ const selected = value => ({ select: () => Promise.resolve(value) });
 
 function request(server, method, url, body, token = a) {
   return new Promise((resolve, reject) => {
-    const headers = { 'Content-Type': 'application/json' };
+    const payload = body === undefined ? null : JSON.stringify(body);
+    const headers = {};
+    if (payload !== null) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(payload);
+    }
     if (token) headers.Authorization = 'Bearer ' + token;
     const req = http.request({ host: '127.0.0.1', port: server.address().port, path: url, method, headers }, res => {
       let text = '';
       res.setEncoding('utf8');
       res.on('data', chunk => { text += chunk; });
       res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(text) }); }
-        catch (err) { reject(err); }
+        try {
+          resolve({ status: res.statusCode, body: text === '' ? undefined : JSON.parse(text), text });
+        } catch (err) {
+          reject(new Error(`Invalid JSON response (HTTP ${res.statusCode}): ${text}`, { cause: err }));
+        }
       });
     });
     req.on('error', reject);
-    if (body !== undefined) req.write(JSON.stringify(body));
-    req.end();
+    if (payload !== null) req.end(payload);
+    else req.end();
   });
 }
 
@@ -188,7 +196,10 @@ test('HTTP messaging authorization acceptance matrix', async t => {
         ['GET', '/api/messages/' + id], ['DELETE', '/api/messages/' + id],
         ['GET', '/api/groups/' + id + '/messages'], ['POST', '/api/groups/' + id + '/messages'],
         ['DELETE', '/api/groups/messages/' + id],
-      ]) assert.equal((await send(method, url, { content: 'hello' })).status, 400);
+      ]) {
+        const body = method === 'POST' ? { content: 'hello' } : undefined;
+        assert.equal((await send(method, url, body)).status, 400);
+      }
     }
   });
 
@@ -296,7 +307,8 @@ test('HTTP messaging authorization acceptance matrix', async t => {
   for (const method of ['GET', 'POST']) {
     await t.test('nonmember cannot ' + method + ' group messages; no message lookup/write', async t => {
       membership(t, false);
-      assert.equal((await send(method, '/api/groups/' + groupId + '/messages', { content: 'hello', senderId: b })).status, 403);
+      const body = method === 'POST' ? { content: 'hello', senderId: b } : undefined;
+      assert.equal((await send(method, '/api/groups/' + groupId + '/messages', body)).status, 403);
     });
   }
   await t.test('group send rechecks membership each request and ignores spoofed sender/timestamp', async t => {
