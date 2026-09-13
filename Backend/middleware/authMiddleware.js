@@ -74,38 +74,61 @@ const login = async (req, res) => {
   }
 };
 
-// Auth middleware (this is what you should import in experienceRoutes.js)
+class AuthenticationError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+    this.code = status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : 'SERVER_ERROR';
+  }
+}
+
+// Shared by HTTP and Socket.IO; JWT claims never supply current account identity.
+const authenticateToken = async (token) => {
+  if (typeof token !== 'string' || !token.trim()) {
+    throw new AuthenticationError(401, 'No token, authorization denied');
+  }
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    throw new AuthenticationError(401, 'Token is not valid');
+  }
+  if (!decoded || typeof decoded._id !== 'string' || !/^[a-f\d]{24}$/i.test(decoded._id)) {
+    throw new AuthenticationError(401, 'Token is not valid');
+  }
+  let user;
+  try {
+    user = await User.findById(decoded._id).select('_id email name department isVerified');
+  } catch (err) {
+    throw new AuthenticationError(500, 'Unable to authenticate account');
+  }
+  if (!user) throw new AuthenticationError(401, 'Account no longer exists');
+  if (user.isVerified !== true || !isAllowedCollegeEmail(user.email)) {
+    throw new AuthenticationError(403, 'A verified college account is required');
+  }
+  return {
+    _id: user._id.toString(),
+    email: normalizeEmail(user.email),
+    name: user.name,
+    department: user.department,
+  };
+};
+
 const authMiddleware = async (req, res, next) => {
   const authorization = req.header('Authorization');
   const match = typeof authorization === 'string' && authorization.match(/^Bearer\s+(\S+)$/i);
   if (!match) {
     return res.status(401).json({ message: 'No token, authorization denied' });
   }
-  let decoded;
   try {
-    decoded = jwt.verify(match[1], process.env.JWT_SECRET);
-    if (!decoded || typeof decoded._id !== 'string' || !/^[a-f\d]{24}$/i.test(decoded._id)) {
-      return res.status(401).json({ message: 'Token is not valid' });
-    }
+    req.user = await authenticateToken(match[1]);
   } catch (err) {
-    return res.status(401).json({ message: 'Token is not valid' });
-  }
-  try {
-    const user = await User.findById(decoded._id).select('_id email name department isVerified');
-    if (!user) return res.status(401).json({ message: 'Account no longer exists' });
-    if (user.isVerified !== true || !isAllowedCollegeEmail(user.email)) {
-      return res.status(403).json({ message: 'A verified college account is required' });
-    }
-    req.user = {
-      _id: user._id.toString(),
-      email: normalizeEmail(user.email),
-      name: user.name,
-      department: user.department,
-    };
-  } catch (err) {
-    return res.status(500).json({ message: 'Unable to authenticate account' });
+    const known = err instanceof AuthenticationError;
+    return res.status(known ? err.status : 500).json({
+      message: known ? err.message : 'Unable to authenticate account',
+    });
   }
   next();
 };
 
-module.exports = { register, login, authMiddleware };
+module.exports = { register, login, authMiddleware, authenticateToken, AuthenticationError };

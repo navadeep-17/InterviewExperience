@@ -1,11 +1,10 @@
 import debounce from 'lodash.debounce';
 import { MessageSquare, Send, User2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 
 const API_URL = import.meta.env.VITE_API_URL;
-const socket = io(API_URL);
 const SingleTick = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}>
     <path d="M5 13l4 4L19 7" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -37,6 +36,8 @@ const MessageComponent = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentUser = JSON.parse(localStorage.getItem('user'));
+  const authToken = localStorage.getItem('authToken');
+  const [socket] = useState(() => io(API_URL, { autoConnect: false }));
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState({}); // { userId: [msg, ...] }
@@ -58,11 +59,12 @@ const MessageComponent = () => {
   const typingTimeout = useRef();
 
   // Debounced typing event
-  const emitTyping = debounce(() => {
-    if (selectedUser) {
-      socket.emit('typing', { to: selectedUser._id, from: currentUser._id });
+  const emitTyping = useMemo(() => debounce(() => {
+    if (selectedUser && socket.connected) {
+      socket.emit('typing', { to: selectedUser._id });
     }
-  }, 400);
+  }, 400), [socket, selectedUser]);
+  useEffect(() => () => emitTyping.cancel(), [emitTyping]);
 
   // Fetch users from backend (excluding current user)
   useEffect(() => {
@@ -95,12 +97,30 @@ const MessageComponent = () => {
       .catch(() => setGroups([]));
   }, [currentUser?._id]);
 
-  // Register current user with socket
+  // Identity is established by the authenticated handshake, never a register event.
   useEffect(() => {
-    if (currentUser?._id) {
-      socket.emit('register', currentUser._id);
+    if (!authToken) {
+      navigate('/login', { replace: true });
+      return;
     }
-  }, [currentUser?._id]);
+    const onConnectError = error => {
+      if (error.data?.code === 'UNAUTHORIZED' || error.data?.code === 'FORBIDDEN') {
+        socket.disconnect();
+        socket.auth = {};
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        navigate('/login', { replace: true });
+      }
+    };
+    socket.on('connect_error', onConnectError);
+    socket.auth = { token: authToken };
+    socket.connect();
+    return () => {
+      socket.off('connect_error', onConnectError);
+      socket.disconnect();
+      socket.auth = {};
+    };
+  }, [socket, authToken, navigate]);
 
   // Receive personal messages
   useEffect(() => {
@@ -154,15 +174,12 @@ const MessageComponent = () => {
   }, [selectedUser]);
 
   const handleSend = () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !socket.connected) return;
 
     if (selectedUser) {
       const newMsg = {
-        senderId: currentUser._id,
         recipientId: selectedUser._id,
         content: newMessage,
-        senderName: currentUser.name,
-        timestamp: new Date(),
       };
       socket.emit('send_message', newMsg);
       setNewMessage('');
@@ -172,10 +189,7 @@ const MessageComponent = () => {
     if (selectedGroup) {
       const groupMsg = {
         groupId: selectedGroup._id,
-        senderId: currentUser._id,
-        senderName: currentUser.name,
         content: newMessage,
-        timestamp: new Date(),
       };
       socket.emit('send_group_message', groupMsg);
       setNewMessage('');

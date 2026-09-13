@@ -9,10 +9,9 @@ const corsOptions = {
   credentials: true,
 };
 const mongoose = require("mongoose");
-const User = require("./models/User");
 const Message = require('./models/Message');
 const Group = require('./models/Group');
-const GroupMessage = require('./models/GroupMessage');
+const { configureRealtime } = require('./socket/realtime');
 
 const app = express();
 
@@ -89,59 +88,7 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http, { cors: corsOptions });
 app.set('io', io);
 
-const userIdToSocketId = {};
-const users = {};
-
-io.on('connection', (socket) => {
-  socket.on('register', async (userId) => {
-    // Join all groups the user is a member of
-    const groups = await Group.find({ members: userId });
-    groups.forEach(group => {
-      socket.join(group._id.toString());
-    });
-    // Save mapping for personal chat
-    socket.userId = userId;
-    userIdToSocketId[userId] = socket.id;
-  });
-
-  // --- ADD THIS HANDLER FOR PERSONAL CHAT ---
-  socket.on('send_message', async (msg) => {
-    // Save to DB
-    const message = await Message.create({
-      senderId: msg.senderId,
-      recipientId: msg.recipientId,
-      content: msg.content,
-      senderName: msg.senderName,
-      timestamp: msg.timestamp || new Date(),
-    });
-
-    // Emit to recipient if online
-    const recipientSocketId = userIdToSocketId[msg.recipientId];
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit('receive_message', message);
-    }
-    // Emit to sender as well (so sender sees their own message)
-    socket.emit('receive_message', message);
-  });
-
-  // Existing group message handler...
-  socket.on('send_group_message', async (msg) => {
-    // Save to DB
-    const message = await GroupMessage.create({
-      groupId: msg.groupId,
-      senderId: msg.senderId,
-      senderName: msg.senderName,
-      content: msg.content,
-      timestamp: new Date()
-    });
-    // Optionally fetch sender avatar
-    const sender = await User.findById(msg.senderId);
-    io.to(msg.groupId).emit('receive_group_message', {
-      ...message.toObject(),
-      sender: { name: sender.name, avatar: sender.avatar }
-    });
-  });
-});
+configureRealtime(io);
 
 app.post('/api/messages/markAsRead', async (req, res) => {
   try {
