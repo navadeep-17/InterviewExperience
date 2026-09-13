@@ -16,6 +16,14 @@ function normalizeEmail(email) {
   return typeof email === 'string' ? email.trim().toLowerCase() : '';
 }
 
+function buildEmailLookup(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) throw new TypeError('Email must be a non-empty string');
+  const escaped = normalized.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+  // Match legacy casing without changing stored records or index definitions.
+  return { email: new RegExp('^' + escaped + '$', 'i') };
+}
+
 function getAllowedEmailDomains(config = process.env.ALLOWED_EMAIL_DOMAINS) {
   return (config === undefined ? 'mgit.ac.in' : config)
     .split(',').map(domain => domain.trim().toLowerCase()).filter(Boolean);
@@ -58,7 +66,7 @@ function pickProfileUpdates(body) {
 
 module.exports = {
   AUTH_USER_FIELDS, OWN_PROFILE_FIELDS, STUDENT_PROFILE_FIELDS,
-  PROFILE_UPDATE_FIELDS, normalizeEmail, getAllowedEmailDomains,
+  PROFILE_UPDATE_FIELDS, normalizeEmail, buildEmailLookup, getAllowedEmailDomains,
   isAllowedCollegeEmail, safeAuthUser, safeOwnProfile, safeStudentProfile,
   pickProfileUpdates,
 };

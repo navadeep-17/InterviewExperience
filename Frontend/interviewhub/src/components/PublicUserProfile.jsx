@@ -72,7 +72,9 @@ const PublicUserProfile = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (userRes.status === 401 || userRes.status === 403) {
-          navigate('/login');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          navigate('/login', { replace: true });
           setLoading(false);
           return;
         }

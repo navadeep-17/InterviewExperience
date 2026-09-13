@@ -9,7 +9,7 @@ const nodemailer = require('nodemailer');
 const Group = require('../models/Group'); // Add at the top
 const {
   AUTH_USER_FIELDS, OWN_PROFILE_FIELDS, STUDENT_PROFILE_FIELDS,
-  normalizeEmail, isAllowedCollegeEmail, safeAuthUser, safeOwnProfile,
+  normalizeEmail, buildEmailLookup, isAllowedCollegeEmail, safeAuthUser, safeOwnProfile,
   safeStudentProfile, pickProfileUpdates,
 } = require('../utils/userPolicy');
 const router = express.Router();
@@ -42,7 +42,7 @@ router.post('/register', requireCollegeEmail, async (req, res) => {
   const { name, email, password, graduationYear, department, context } = req.body;
 
   try {
-    const userExists = await User.findOne({ email }).select('_id');
+    const userExists = await User.findOne(buildEmailLookup(email)).select('_id');
     if (userExists) return res.status(400).json({ message: 'Email already in use' });
 
     const user = new User({
@@ -101,7 +101,7 @@ router.post('/login', requireCollegeEmail, async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email }).select([...AUTH_USER_FIELDS, 'password', 'isVerified'].join(' '));
+    const user = await User.findOne(buildEmailLookup(email)).select([...AUTH_USER_FIELDS, 'password', 'isVerified'].join(' '));
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -188,7 +188,7 @@ router.post('/send-otp', requireCollegeEmail, async (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-  const user = await User.findOneAndUpdate({ email }, { otp, otpExpiry }).select('_id');
+  const user = await User.findOneAndUpdate(buildEmailLookup(email), { otp, otpExpiry }).select('_id');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   // Send OTP via email with context
@@ -220,7 +220,7 @@ router.post('/send-otp', requireCollegeEmail, async (req, res) => {
 // Verify OTP
 router.post('/verify-otp', requireCollegeEmail, async (req, res) => {
   const { email, otp } = req.body;
-  const user = await User.findOne({ email }).select([...AUTH_USER_FIELDS, 'otp', 'otpExpiry', 'isVerified'].join(' '));
+  const user = await User.findOne(buildEmailLookup(email)).select([...AUTH_USER_FIELDS, 'otp', 'otpExpiry', 'isVerified'].join(' '));
   if (!hasValidOtp(user, otp)) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }
@@ -237,7 +237,7 @@ router.post('/verify-otp', requireCollegeEmail, async (req, res) => {
 // Request password reset (send OTP)
 router.post('/forgot-password', requireCollegeEmail, async (req, res) => {
   const { email, context } = req.body;
-  const user = await User.findOne({ email }).select('_id email');
+  const user = await User.findOne(buildEmailLookup(email)).select('_id email');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -273,7 +273,7 @@ router.post('/forgot-password', requireCollegeEmail, async (req, res) => {
 // Reset password
 router.post('/reset-password', requireCollegeEmail, async (req, res) => {
   const { email, otp, newPassword } = req.body;
-  const user = await User.findOne({ email }).select('_id otp otpExpiry isVerified');
+  const user = await User.findOne(buildEmailLookup(email)).select('_id otp otpExpiry isVerified');
   if (!hasValidOtp(user, otp)) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }

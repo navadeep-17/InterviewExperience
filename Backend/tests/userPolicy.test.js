@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const User = require('../models/User');
 const {
-  normalizeEmail, getAllowedEmailDomains, isAllowedCollegeEmail,
+  normalizeEmail, buildEmailLookup, getAllowedEmailDomains, isAllowedCollegeEmail,
   safeAuthUser, safeOwnProfile, safeStudentProfile, pickProfileUpdates,
 } = require('../utils/userPolicy');
 
@@ -47,6 +47,45 @@ test('only exact configured domains match', () => {
   assert.equal(isAllowedCollegeEmail('user@EXAMPLE.EDU', config), true);
   assert.equal(isAllowedCollegeEmail('user@sub.mgit.ac.in', config), true);
   assert.equal(isAllowedCollegeEmail('user@mgit.ac.in', ' , '), false);
+});
+
+test('legacy email lookup matches casing exactly and survives Mongoose query casting', () => {
+  const lookup = buildEmailLookup(' STUDENT@MGIT.AC.IN ');
+  const query = User.findOne(lookup);
+  query.cast(User); // No database access.
+  const regex = query.getFilter().email;
+  assert.equal(regex.flags, 'i');
+  assert.equal(regex.source, '^student@mgit\\.ac\\.in$');
+  for (const email of ['student@mgit.ac.in', 'Student@mgit.ac.in', 'STUDENT@MGIT.AC.IN']) {
+    assert.equal(regex.test(email), true);
+  }
+  for (const email of ['student@mgit.ac.in.evil.com', 'otherstudent@mgit.ac.in', 'student@mgitXacYin']) {
+    assert.equal(regex.test(email), false);
+  }
+});
+
+test('every accepted regex metacharacter is literal in email lookups', () => {
+  for (const character of '.*+?^$(){}[]|\\') {
+    const email = 'student' + character + 'tag@mgit.ac.in';
+    assert.equal(isAllowedCollegeEmail(email, 'mgit.ac.in'), true);
+    const regex = buildEmailLookup(email).email;
+    assert.equal(regex.flags, 'i');
+    assert.equal(regex.test(email), true);
+    assert.equal(regex.test('studenttag@mgit.ac.in'), false);
+    assert.equal(regex.test(email + '.evil.com'), false);
+  }
+  const regex = buildEmailLookup('student.*|admin@mgit.ac.in').email;
+  assert.equal(regex.test('student.*|admin@mgit.ac.in'), true);
+  assert.equal(regex.test('student-anything@mgit.ac.in'), false);
+  assert.equal(regex.test('admin@mgit.ac.in'), false);
+});
+
+test('email lookup rejects empty/non-string input and preserves canonical normalization', () => {
+  for (const input of ['', '  ', null, undefined, {}, { $ne: null }]) {
+    assert.throws(() => buildEmailLookup(input), TypeError);
+  }
+  assert.equal(normalizeEmail(' Student@MGIT.AC.IN '), 'student@mgit.ac.in');
+  assert.equal(new User({ email: ' Student@MGIT.AC.IN ' }).email, 'student@mgit.ac.in');
 });
 
 for (const [name, serialize, expected] of [

@@ -24,6 +24,10 @@ const authKeys = ['_id', 'name', 'email', 'department', 'graduationYear', 'avata
 const ownKeys = [...authKeys, 'rollNumber', 'currentlyStudying', 'phoneNumber'].sort();
 const studentKeys = ['_id', 'name', 'department', 'graduationYear', 'currentlyStudying', 'avatar'].sort();
 
+function assertEmailLookup(filter) {
+  assert.deepEqual(filter, { email: /^student@mgit\.ac\.in$/i });
+}
+
 // Intentionally return extra fields even after select(), exercising the
 // serializer independently of the positive database projection.
 function selected(value, requiredFields = []) {
@@ -184,7 +188,7 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
   }
   await t.test('registration normalizes email and preserves department/group/OTP flow', async t => {
     t.mock.method(User, 'findOne', filter => {
-      assert.deepEqual(filter, { email: account.email });
+      assertEmailLookup(filter);
       return selected(null);
     });
     const savedUsers = [];
@@ -210,14 +214,32 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
     assert.equal(sent, 1);
     assert.deepEqual(Object.keys(res.body), ['message']);
   });
-  await t.test('login selects password explicitly and serializes safe auth user', async t => {
+  await t.test('registration rejects a mixed-case legacy duplicate without saving a new user', async t => {
+    const legacyUser = { ...account, email: 'Student@mgit.ac.in' };
     t.mock.method(User, 'findOne', filter => {
-      assert.deepEqual(filter, { email: account.email });
-      return selected(account, ['password', 'isVerified', ...authKeys]);
+      assertEmailLookup(filter);
+      return selected(filter.email.test(legacyUser.email) ? legacyUser : null);
+    });
+    const save = t.mock.method(User.prototype, 'save', async () => {
+      throw new Error('Must not create a duplicate');
+    });
+    const res = await request(server, 'POST', '/api/auth/register', {
+      email: 'student@mgit.ac.in', name: 'Student', password: 'password-fixture',
+      department: 'CSE', graduationYear: '2027',
+    });
+    assert.equal(res.status, 400);
+    assert.deepEqual(res.body, { message: 'Email already in use' });
+    assert.equal(save.mock.callCount(), 0);
+  });
+  await t.test('lowercase login finds a mixed-case legacy account and serializes safe auth user', async t => {
+    const legacyUser = { ...account, email: 'Student@mgit.ac.in' };
+    t.mock.method(User, 'findOne', filter => {
+      assertEmailLookup(filter);
+      return selected(filter.email.test(legacyUser.email) ? legacyUser : null, ['password', 'isVerified', ...authKeys]);
     });
     t.mock.method(bcrypt, 'compare', async (input, stored) => input === stored);
     const res = await request(server, 'POST', '/api/auth/login', {
-      email: ' STUDENT@MGIT.AC.IN ', password: 'password-fixture',
+      email: 'student@mgit.ac.in', password: 'password-fixture',
     });
     assert.equal(res.status, 200);
     assert.equal(res.body.token, 'issued-token-fixture');
@@ -225,8 +247,11 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
   });
   await t.test('OTP verification selects OTP state and never serializes it', async t => {
     let saved = false;
-    const user = { ...account, isVerified: false, async save() { saved = true; } };
-    t.mock.method(User, 'findOne', () => selected(user, ['otp', 'otpExpiry']));
+    const user = { ...account, email: 'Student@mgit.ac.in', isVerified: false, async save() { saved = true; } };
+    t.mock.method(User, 'findOne', filter => {
+      assertEmailLookup(filter);
+      return selected(filter.email.test(user.email) ? user : null, ['otp', 'otpExpiry']);
+    });
     const res = await request(server, 'POST', '/api/auth/verify-otp', {
       email: ' STUDENT@MGIT.AC.IN ', otp: account.otp,
     });
@@ -252,10 +277,10 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
   }
   await t.test('password reset still saves a new password and clears OTP state', async t => {
     let saved = false;
-    const user = { ...account, async save() { saved = true; } };
+    const user = { ...account, email: 'Student@mgit.ac.in', async save() { saved = true; } };
     t.mock.method(User, 'findOne', filter => {
-      assert.deepEqual(filter, { email: account.email });
-      return selected(user, ['otp', 'otpExpiry', 'isVerified']);
+      assertEmailLookup(filter);
+      return selected(filter.email.test(user.email) ? user : null, ['otp', 'otpExpiry', 'isVerified']);
     });
     const res = await request(server, 'POST', '/api/auth/reset-password', {
       email: ' STUDENT@MGIT.AC.IN ', otp: account.otp, newPassword: 'new-password-fixture',
@@ -270,15 +295,15 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
   for (const path of ['send-otp', 'forgot-password']) {
     await t.test(path + ' normalizes email and preserves OTP delivery', async t => {
       let saved = false;
-      const user = { ...account, async save() { saved = true; } };
+      const user = { ...account, email: 'Student@mgit.ac.in', async save() { saved = true; } };
       const query = path === 'send-otp' ? 'findOneAndUpdate' : 'findOne';
       t.mock.method(User, query, (filter, update) => {
-        assert.deepEqual(filter, { email: account.email });
+        assertEmailLookup(filter);
         if (update) {
           assert.deepEqual(Object.keys(update).sort(), ['otp', 'otpExpiry']);
           saved = true;
         }
-        return selected(user);
+        return selected(filter.email.test(user.email) ? user : null);
       });
       let sent = false;
       t.mock.method(nodemailer, 'createTransport', () => ({
