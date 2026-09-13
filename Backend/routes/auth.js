@@ -7,7 +7,29 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const Message = require('../models/Message');
 const nodemailer = require('nodemailer');
 const Group = require('../models/Group'); // Add at the top
+const {
+  AUTH_USER_FIELDS, OWN_PROFILE_FIELDS, STUDENT_PROFILE_FIELDS,
+  normalizeEmail, isAllowedCollegeEmail, safeAuthUser, safeOwnProfile,
+  safeStudentProfile, pickProfileUpdates,
+} = require('../utils/userPolicy');
 const router = express.Router();
+
+// Apply the same normalized college-email policy to every active auth flow.
+const requireCollegeEmail = (req, res, next) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!isAllowedCollegeEmail(email)) {
+    return res.status(400).json({ message: 'Use an allowed college email address' });
+  }
+  req.body.email = email;
+  next();
+};
+
+const hasValidOtp = (user, otp) => (
+  user && typeof otp === 'string' && otp.length > 0 &&
+  user.otp === otp && user.otpExpiry != null &&
+  Number.isFinite(new Date(user.otpExpiry).getTime()) &&
+  Date.now() <= new Date(user.otpExpiry).getTime()
+);
 
 // Generate JWT
 const generateToken = (user) => {
@@ -16,11 +38,11 @@ const generateToken = (user) => {
 };
 
 // Sign Up - User Registration
-router.post('/register', async (req, res) => {
+router.post('/register', requireCollegeEmail, async (req, res) => {
   const { name, email, password, graduationYear, department, context } = req.body;
 
   try {
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email }).select('_id');
     if (userExists) return res.status(400).json({ message: 'Email already in use' });
 
     const user = new User({
@@ -70,29 +92,26 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({ message: 'Registration successful. Please verify your email.' });
   } catch (error) {
-    res.status(500).json({ message: 'Registration failed', error: error.message });
+    res.status(500).json({ message: 'Registration failed' });
   }
 });
 
 // Login - User Authentication
-router.post('/login', async (req, res) => {
+router.post('/login', requireCollegeEmail, async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select([...AUTH_USER_FIELDS, 'password', 'isVerified'].join(' '));
     if (!user) {
-      console.log('No user found for email:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    if (!user.isVerified) {
-      console.log('User not verified:', email);
+    if (user.isVerified !== true || !isAllowedCollegeEmail(user.email)) {
       return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      console.log('Password mismatch for user:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
@@ -100,14 +119,9 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-      }
+      user: safeAuthUser(user),
     });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -115,31 +129,37 @@ router.post('/login', async (req, res) => {
 // Update current user's profile
 router.put('/me', authMiddleware, async (req, res) => {
   try {
-    const updates = req.body;
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });
+    const updates = pickProfileUpdates(req.body);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No editable profile fields provided' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id, { $set: updates }, { new: true, runValidators: true }
+    ).select(OWN_PROFILE_FIELDS.join(' '));
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    res.json(safeOwnProfile(user));
   } catch (error) {
-    res.status(500).json({ message: 'Profile update failed', error: error.message });
+    const invalid = error instanceof TypeError || ['ValidationError', 'CastError'].includes(error.name);
+    res.status(invalid ? 400 : 500).json({ message: invalid ? 'Invalid profile updates' : 'Profile update failed' });
   }
 });
 
 // Get current user's profile
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user._id).select(OWN_PROFILE_FIELDS.join(' '));
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    res.json(safeOwnProfile(user));
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 // Get all users except the current user
 router.get('/all', authMiddleware, async (req, res) => {
   try {
-    const users = await User.find({ _id: { $ne: req.user._id } }).select('-password');
-    res.json(users);
+    const users = await User.find({ _id: { $ne: req.user._id } }).select(STUDENT_PROFILE_FIELDS.join(' '));
+    res.json(users.map(safeStudentProfile));
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users' });
   }
@@ -163,12 +183,12 @@ router.get('/messages/:userId', authMiddleware, async (req, res) => {
 });
 
 // Send OTP (general purpose)
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', requireCollegeEmail, async (req, res) => {
   const { email, context } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-  const user = await User.findOneAndUpdate({ email }, { otp, otpExpiry });
+  const user = await User.findOneAndUpdate({ email }, { otp, otpExpiry }).select('_id');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   // Send OTP via email with context
@@ -198,10 +218,10 @@ router.post('/send-otp', async (req, res) => {
 });
 
 // Verify OTP
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', requireCollegeEmail, async (req, res) => {
   const { email, otp } = req.body;
-  const user = await User.findOne({ email });
-  if (!user || user.otp !== otp || Date.now() > user.otpExpiry) {
+  const user = await User.findOne({ email }).select([...AUTH_USER_FIELDS, 'otp', 'otpExpiry', 'isVerified'].join(' '));
+  if (!hasValidOtp(user, otp)) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }
   user.otp = undefined;
@@ -211,13 +231,13 @@ router.post('/verify-otp', async (req, res) => {
 
   // Generate JWT and return user info
   const token = generateToken(user);
-  res.json({ token, user });
+  res.json({ token, user: safeAuthUser(user) });
 });
 
 // Request password reset (send OTP)
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', requireCollegeEmail, async (req, res) => {
   const { email, context } = req.body;
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select('_id email');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -251,13 +271,13 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', requireCollegeEmail, async (req, res) => {
   const { email, otp, newPassword } = req.body;
-  const user = await User.findOne({ email });
-  if (!user || user.otp !== otp || Date.now() > user.otpExpiry) {
+  const user = await User.findOne({ email }).select('_id otp otpExpiry isVerified');
+  if (!hasValidOtp(user, otp)) {
     return res.status(400).json({ message: 'Invalid or expired OTP' });
   }
-  if (!user.isVerified) {
+  if (user.isVerified !== true) {
     return res.status(403).json({ message: 'Please verify your email before resetting password.' });
   }
   user.password = newPassword; // Don't hash here!
@@ -276,6 +296,13 @@ router.delete('/messages/:messageId', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete message' });
   }
+});
+
+// Express 5 forwards rejected async handlers here. Never expose provider,
+// database, or validation error details through authentication responses.
+router.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  res.status(500).json({ message: 'Authentication request failed' });
 });
 
 module.exports = router;

@@ -60,9 +60,23 @@ const PublicUserProfile = () => {
   useEffect(() => {
     const fetchUserAndExperiences = async () => {
       setLoading(true);
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        navigate('/login');
+        setLoading(false);
+        return;
+      }
       try {
         // Fetch user info
-        const userRes = await fetch(`${API_URL}/api/users/${id}`);
+        const userRes = await fetch(`${API_URL}/api/users/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (userRes.status === 401 || userRes.status === 403) {
+          navigate('/login');
+          setLoading(false);
+          return;
+        }
+        if (!userRes.ok) throw new Error('Unable to fetch student profile');
         const userData = await userRes.json();
 
         // Fetch user's experiences
