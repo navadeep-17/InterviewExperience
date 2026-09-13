@@ -2,8 +2,22 @@ import { MessageCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom"; // <-- updated import
 import ExperienceCard from "./ExperienceCard";
+const MAX_NESTING = 3;
 const API_URL = import.meta.env.VITE_API_URL;
 const PublicUserProfile = () => {
+  const fetchContent = async url => {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+    });
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      navigate('/login', { replace: true });
+    }
+    if (!response.ok) throw new Error('Unable to fetch content');
+    return response;
+  };
+
   const { id } = useParams();
   const [userInfo, setUserInfo] = useState(null);
   const [experiences, setExperiences] = useState([]);
@@ -82,8 +96,9 @@ const PublicUserProfile = () => {
         const userData = await userRes.json();
 
         // Fetch user's experiences
-        const expRes = await fetch(`${API_URL}/api/experiences/user/${id}`);
+        const expRes = await fetchContent(`${API_URL}/api/experiences/user/${id}`);
         let expData = await expRes.json();
+        if (!Array.isArray(expData)) throw new Error('Invalid experience response');
         expData = expData.map(exp => ({ ...exp, user: userData }));
 
         setUserInfo(userData);
@@ -93,8 +108,9 @@ const PublicUserProfile = () => {
         const commentsObj = {};
         const countsObj = {};
         for (const exp of expData) {
-          const res = await fetch(`${API_URL}/api/comments/experience/${exp._id}`);
+          const res = await fetchContent(`${API_URL}/api/comments/experience/${exp._id}`);
           const comments = await res.json();
+          if (!Array.isArray(comments)) throw new Error('Invalid comment response');
           commentsObj[exp._id] = comments;
           countsObj[exp._id] = comments.length;
         }
@@ -114,9 +130,10 @@ const PublicUserProfile = () => {
   const fetchComments = async (expId) => {
     setCommentLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/comments/experience/${expId}`);
+      const res = await fetchContent(`${API_URL}/api/comments/experience/${expId}`);
       if (res.ok) {
         const comments = await res.json();
+        if (!Array.isArray(comments)) throw new Error('Invalid comment response');
         setAllComments((prev) => ({
           ...prev,
           [expId]: comments,
@@ -370,7 +387,7 @@ const PublicUserProfile = () => {
                       setEditingCommentId(commentId);
                       setEditingCommentText(commentText);
                     }}
-                    handleEditCommentSave={(commentId, postId) => handleEditCommentSave(commentId, postId)}
+                    handleEditCommentSave={(postId, commentId) => handleEditCommentSave(commentId, postId)}
                     handleDeleteComment={(commentId, postId) => handleDeleteComment(commentId, postId)}
                     replyingTo={replyingTo}
                     setReplyingTo={setReplyingTo}
@@ -379,7 +396,7 @@ const PublicUserProfile = () => {
                     collapsedComments={collapsedComments}
                     setCollapsedComments={setCollapsedComments}
                     highlightedCommentId={highlightedCommentId}
-                    MAX_NESTING={2}
+                    MAX_NESTING={MAX_NESTING}
                     handlePostReply={(postId, parentId) => handlePostReply(postId, parentId)}
                     handleUpvote={handleUpvote}
                     handleDownvote={handleDownvote}

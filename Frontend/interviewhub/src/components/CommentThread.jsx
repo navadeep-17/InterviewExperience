@@ -131,13 +131,13 @@ const CommentThread = ({
           </div>
           {/* Reply Button and Input */}
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <button
+            {level + 1 < MAX_NESTING && <button
               className="text-xs text-blue-500 hover:underline focus:underline"
               onClick={() => setReplyingTo(comment._id)}
             >
               Reply
-            </button>
-            {replyingTo === comment._id && (
+            </button>}
+            {level + 1 < MAX_NESTING && replyingTo === comment._id && (
               <div className="flex items-center gap-2 mt-2 w-full">
                 <input
                   type="text"

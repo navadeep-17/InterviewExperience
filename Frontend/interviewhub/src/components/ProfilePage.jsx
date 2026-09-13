@@ -3,7 +3,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; // <-- Add this import
 import ExperienceCard from "./ExperienceCard";
 
+const MAX_NESTING = 3;
 const API_URL = import.meta.env.VITE_API_URL;
+
+const experienceContent = data => ({
+  company: data.company, role: data.role, difficulty: data.difficulty,
+  roundDate: data.roundDate, description: data.description, tips: data.tips,
+  rounds: data.rounds?.map(({ roundName, questions, duration }) => ({ roundName, questions, duration })),
+});
+
 
 // Helper components
 const Input = ({ label, ...props }) => (
@@ -24,6 +32,19 @@ const ProfileDetail = ({ label, value }) => (
 );
 
 const ProfilePage = () => {
+  const fetchContent = async url => {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+    });
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      navigate('/login', { replace: true });
+    }
+    if (!response.ok) throw new Error('Unable to fetch content');
+    return response;
+  };
+
   const [userData, setUserData] = useState({
     name: "",
     rollNumber: "",
@@ -110,9 +131,10 @@ const ProfilePage = () => {
       setPostsLoading(true);
       try {
         if (userData._id) {
-          const res = await fetch(`${API_URL}/api/experiences/user/${userData._id}`);
+          const res = await fetchContent(`${API_URL}/api/experiences/user/${userData._id}`);
           if (res.ok) {
             let posts = await res.json();
+            if (!Array.isArray(posts)) throw new Error('Invalid experience response');
             // Ensure each post has user info
             posts = posts.map((post) => ({
               ...post,
@@ -136,9 +158,10 @@ const ProfilePage = () => {
       const counts = {};
       for (const post of userPosts) {
         try {
-          const res = await fetch(`${API_URL}/api/comments/experience/${post._id}`);
+          const res = await fetchContent(`${API_URL}/api/comments/experience/${post._id}`);
           if (res.ok) {
             const comments = await res.json();
+            if (!Array.isArray(comments)) throw new Error('Invalid comment response');
             all[post._id] = comments;
             counts[post._id] = comments.length;
           }
@@ -246,9 +269,10 @@ const ProfilePage = () => {
   const fetchComments = async (postId) => {
     setCommentLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/comments/experience/${postId}`);
+      const res = await fetchContent(`${API_URL}/api/comments/experience/${postId}`);
       if (res.ok) {
         const comments = await res.json();
+        if (!Array.isArray(comments)) throw new Error('Invalid comment response');
         setAllComments((prev) => ({
           ...prev,
           [postId]: comments,
@@ -295,6 +319,11 @@ const ProfilePage = () => {
       }
     } catch (err) {}
     setCommentLoading(false);
+  };
+
+  const handleEditComment = (commentId, commentText) => {
+    setEditingCommentId(commentId);
+    setEditingCommentText(commentText);
   };
 
   // Edit a comment
@@ -577,7 +606,7 @@ const ProfilePage = () => {
                 editingCommentText={editingCommentText}
                 setEditingCommentId={setEditingCommentId}
                 setEditingCommentText={setEditingCommentText}
-                handleEditComment={() => {}}
+                handleEditComment={handleEditComment}
                 handleEditCommentSave={(postId, commentId) => handleEditCommentSave(commentId, postId)}
                 handleDeleteComment={(postId, commentId) => handleDeleteComment(commentId, postId)}
                 replyingTo={replyingTo}
@@ -587,7 +616,7 @@ const ProfilePage = () => {
                 collapsedComments={collapsedComments}
                 setCollapsedComments={setCollapsedComments}
                 highlightedCommentId={highlightedCommentId}
-                MAX_NESTING={2}
+                MAX_NESTING={MAX_NESTING}
                 handlePostReply={handlePostReply}
                 handleUpvote={handleUpvote} 
                 handleDownvote={handleDownvote} 
@@ -625,7 +654,7 @@ const ProfilePage = () => {
                         "Content-Type": "application/json",
                         Authorization: `Bearer ${token}`,
                       },
-                      body: JSON.stringify(editFormData),
+                      body: JSON.stringify(experienceContent(editFormData)),
                     }
                   );
                   if (res.ok) {

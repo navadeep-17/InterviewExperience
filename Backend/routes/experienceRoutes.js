@@ -2,43 +2,37 @@ const express = require('express');
 const router = express.Router();
 const Experience = require('../models/Experience');
 const Comment = require('../models/Comment');
-const User = require('../models/User');
 const { authMiddleware } = require('../middleware/authMiddleware');
-const { upvoteExperience, downvoteExperience } = require('../controllers/experienceController');
+const { createExperience, upvoteExperience, downvoteExperience, pickExperienceContent, presentExperience, ContentInputError, validId } = require('../controllers/experienceController');
 
 // POST: Create new experience (user from token)
-router.post('/', authMiddleware, async (req, res) => {
-  try {
-    const experience = new Experience({
-      ...req.body,
-      user: req.user._id
-    });
-    await experience.save();
-    res.status(201).json(experience);
-  } catch (err) {
-    res.status(400).json({ message: 'Server error', error: err.message });
-  }
-});
+router.post('/', authMiddleware, createExperience);
 
 // GET: Fetch all experiences with user's name, latest comment (with user), pagination, filters
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const { page: rawPage = '1', limit: rawLimit = '10', sortOrder = 'latest' } = req.query;
+    const positiveInteger = value => typeof value === 'string' && /^[1-9]\d*$/.test(value) && value === value.trim() && Number.isSafeInteger(Number(value));
+    if (!positiveInteger(rawPage) || !positiveInteger(rawLimit) ||
+        Object.keys(req.query).some(key => /^(page|limit|company|role|department|difficulty|sortOrder)\[/.test(key))) throw new ContentInputError();
+    const page = Number(rawPage);
+    const limit = Math.min(Number(rawLimit), 50);
     const skip = (page - 1) * limit;
-
-    // Build filter object
+    if (!Number.isSafeInteger(skip) || !['latest', 'oldest'].includes(sortOrder)) throw new ContentInputError();
     const filter = {};
-    if (req.query.company) filter.company = { $regex: req.query.company, $options: 'i' };
-    if (req.query.role) filter.role = { $regex: req.query.role, $options: 'i' };
-    if (req.query.department) filter.department = { $regex: req.query.department, $options: 'i' };
-    if (req.query.difficulty) filter.difficulty = { $regex: `^${req.query.difficulty}$`, $options: 'i' };
-
-    // Sorting
-    let sort = { createdAt: -1 };
-    if (req.query.sortOrder === 'oldest') {
-      sort = { createdAt: 1 };
+    for (const key of ['company', 'role', 'department', 'difficulty']) {
+      const value = req.query[key];
+      if (value === undefined) continue;
+      if (typeof value !== 'string') throw new ContentInputError();
+      if (!value) continue;
+      if (key === 'difficulty') {
+        if (!['Easy', 'Medium', 'Hard'].includes(value)) throw new ContentInputError();
+        filter.difficulty = value;
+      } else {
+        filter[key] = { $regex: value.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&'), $options: 'i' };
+      }
     }
+    const sort = { createdAt: sortOrder === 'oldest' ? 1 : -1 };
 
     const total = await Experience.countDocuments(filter);
     const experiences = await Experience.find(filter)
@@ -99,18 +93,19 @@ router.get('/', async (req, res) => {
     });
 
     res.json({
-      experiences,
+      experiences: experiences.map(presentExperience),
       total,
       page,
       totalPages: Math.ceil(total / limit)
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(error instanceof ContentInputError ? 400 : 500).json({ message: 'Unable to process experience request' });
   }
 });
 
 // PUT: Update experience (ownership check)
 router.put('/:id', authMiddleware, async (req, res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ message: 'Invalid experience ID' });
   try {
     const experience = await Experience.findById(req.params.id);
 
@@ -118,16 +113,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (experience.user.toString() !== req.user._id)
       return res.status(403).json({ message: 'Unauthorized' });
 
-    Object.assign(experience, req.body);
+    const content = pickExperienceContent(req.body);
+    for (const [field, value] of Object.entries(content)) experience[field] = value;
     await experience.save();
-    res.json(experience);
+    res.json(presentExperience(experience));
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(error instanceof ContentInputError ? 400 : 500).json({ message: 'Unable to process experience request' });
   }
 });
 
 // DELETE: Delete experience (ownership check)
 router.delete('/:id', authMiddleware, async (req, res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ message: 'Invalid experience ID' });
   try {
     const experience = await Experience.findById(req.params.id);
 
@@ -135,20 +132,22 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (experience.user.toString() !== req.user._id)
       return res.status(403).json({ message: 'Unauthorized' });
 
+    await Comment.deleteMany({ experienceId: experience._id });
     await experience.deleteOne();
     res.json({ message: 'Experience deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(error instanceof ContentInputError ? 400 : 500).json({ message: 'Unable to process experience request' });
   }
 });
 
 // Get all posts by a user
-router.get('/user/:userId', async (req, res) => {
+router.get('/user/:userId', authMiddleware, async (req, res) => {
+  if (!validId(req.params.userId)) return res.status(400).json({ message: 'Invalid user ID' });
   try {
     const posts = await Experience.find({ user: req.params.userId })
       .sort({ createdAt: -1 })
       .populate('user', 'name department graduationYear avatar _id');
-    res.json(posts);
+    res.json(posts.map(presentExperience));
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch user posts' });
   }

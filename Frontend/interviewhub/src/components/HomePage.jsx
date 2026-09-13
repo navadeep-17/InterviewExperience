@@ -18,6 +18,13 @@ dayjs.extend(relativeTime);
 const MAX_NESTING = 3;
 const API_URL = import.meta.env.VITE_API_URL;
 
+const experienceContent = data => ({
+  company: data.company, role: data.role, difficulty: data.difficulty,
+  roundDate: data.roundDate, description: data.description, tips: data.tips,
+  rounds: data.rounds?.map(({ roundName, questions, duration }) => ({ roundName, questions, duration })),
+});
+
+
 const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [page, setPage] = useState(1);
@@ -32,7 +39,6 @@ const HomePage = () => {
   const [formData, setFormData] = useState({
     company: '',
     role: '',
-    department: '',
     difficulty: '',
     roundDate: '',
     description: '',
@@ -71,6 +77,13 @@ const HomePage = () => {
   const [user, setUser] = useState(null);
 
   const navigate = useNavigate();
+  const handleContentAuthFailure = status => {
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      navigate('/login', { replace: true });
+    }
+  };
 
   // Responsive sidebar
   useEffect(() => {
@@ -115,8 +128,10 @@ const HomePage = () => {
             `${API_URL}/api/comments/experience/${exp._id}/count`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
+          if (!Number.isSafeInteger(res.data.count) || res.data.count < 0) throw new Error('Invalid count response');
           counts[exp._id] = res.data.count;
-        } catch {
+        } catch (err) {
+          handleContentAuthFailure(err.response?.status);
           counts[exp._id] = 0;
         }
       })
@@ -138,8 +153,11 @@ const HomePage = () => {
         sortOrder
       };
       Object.keys(params).forEach(key => !params[key] && delete params[key]);
-      const response = await axios.get(`${API_URL}/api/experiences`, { params });
+      const response = await axios.get(`${API_URL}/api/experiences`, {
+        params, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
+      });
       const exps = response.data.experiences;
+      if (!Array.isArray(exps)) throw new Error('Invalid experience response');
       if (pageNum === 1) {
         setExperiences(exps);
       } else {
@@ -149,6 +167,7 @@ const HomePage = () => {
       setLoading(false);
       await fetchCommentCounts(exps);
     } catch (err) {
+      handleContentAuthFailure(err.response?.status);
       setError('Failed to load experiences.');
       setLoading(false);
     }
@@ -197,14 +216,13 @@ const HomePage = () => {
       const token = localStorage.getItem('authToken');
       await axios.post(
         `${API_URL}/api/experiences`,
-        formData,
+        experienceContent(formData),
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setShowForm(false);
       setFormData({
         company: '',
         role: '',
-        department: '',
         difficulty: '',
         roundDate: '',
         description: '',
@@ -282,8 +300,10 @@ const HomePage = () => {
         `${API_URL}/api/comments/experience/${expId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (!Array.isArray(res.data)) throw new Error('Invalid comment response');
       setAllComments(prev => ({ ...prev, [expId]: res.data }));
-    } catch {
+    } catch (err) {
+      handleContentAuthFailure(err.response?.status);
       setAllComments(prev => ({ ...prev, [expId]: [] }));
     }
   };
@@ -295,9 +315,9 @@ const HomePage = () => {
     // eslint-disable-next-line
   }, [experiences]);
 
-  const handleEditComment = (comment) => {
-    setEditingCommentId(comment._id);
-    setEditingCommentText(comment.text);
+  const handleEditComment = (commentId, commentText) => {
+    setEditingCommentId(commentId);
+    setEditingCommentText(commentText);
   };
 
   const handleEditCommentSave = async (expId, commentId) => {
@@ -751,7 +771,7 @@ const HomePage = () => {
                   const token = localStorage.getItem('authToken');
                   await axios.put(
                     `${API_URL}/api/experiences/${editFormData._id}`,
-                    editFormData,
+                    experienceContent(editFormData),
                     {
                       headers: { Authorization: `Bearer ${token}` },
                     }
