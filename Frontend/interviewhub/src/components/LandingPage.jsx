@@ -1,10 +1,7 @@
 import { User2 } from "lucide-react";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AuthForm from "./A";
 
 export default function LandingPage() {
-  const [showAuth, setShowAuth] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -94,34 +91,6 @@ export default function LandingPage() {
         </ul>
       </section>
 
-      {/* Auth Modal */}
-      {showAuth && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] transition">
-          <div className="absolute inset-0" onClick={() => setShowAuth(false)} />
-          <div
-            className="relative z-10 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto
-        bg-gradient-to-br from-white/90 via-indigo-50/80 to-blue-100/80
-        backdrop-blur-2xl border border-indigo-100 shadow-2xl
-        rounded-3xl p-2 sm:p-4 md:p-8 flex flex-col items-center
-        transition-all duration-300 animate-modal-in"
-            role="dialog"
-            aria-modal="true"
-            style={{ animation: "modal-in 0.3s forwards" }}
-          >
-            <button
-              className="absolute top-3 right-3 text-slate-400 hover:text-slate-700 text-3xl font-bold transition-transform duration-200 hover:scale-125"
-              onClick={() => setShowAuth(false)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-            <div className="w-full flex flex-col items-center">
-              <AuthForm />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Animations */}
       <style>
         {`
@@ -131,13 +100,6 @@ export default function LandingPage() {
           }
           .animate-fade-in {
             animation: fade-in 0.8s cubic-bezier(.4,0,.2,1) both;
-          }
-          @keyframes modal-in {
-            from { opacity: 0; transform: scale(0.95);}
-            to { opacity: 1; transform: scale(1);}
-          }
-          .animate-modal-in {
-            animation: modal-in 0.3s cubic-bezier(.4,0,.2,1) forwards;
           }
         `}
       </style>

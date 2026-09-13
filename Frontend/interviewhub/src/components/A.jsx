@@ -1,6 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL;
 function AuthForm() {
@@ -23,14 +23,34 @@ function AuthForm() {
   const [resetMsg, setResetMsg] = useState('');
   const [showReset, setShowReset] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     const authToken = localStorage.getItem('authToken');
-    if (authToken && location.pathname !== '/home') {
-      navigate('/home');
-    }
-  }, [navigate, location.pathname]);
+    if (!authToken) return;
+    let cancelled = false;
+    const validateSession = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (cancelled || localStorage.getItem('authToken') !== authToken) return;
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+        } else if (response.ok) {
+          const user = await response.json();
+          if (!cancelled && localStorage.getItem('authToken') === authToken && user?._id) {
+            localStorage.setItem('user', JSON.stringify(user));
+            navigate('/home', { replace: true });
+          }
+        }
+      } catch {
+        // Temporary connectivity failures leave the login form and credentials available.
+      }
+    };
+    validateSession();
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   const isCollegeEmail = (email) => /^[a-zA-Z0-9._-]+@mgit\.ac\.in$/.test(email);
 

@@ -5,6 +5,7 @@ import LandingPage from './components/LandingPage';
 import MessageComponent from './components/Message';
 import ProfilePage from './components/ProfilePage'; // profile page
 import PublicUserProfile from './components/PublicUserProfile';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -12,10 +13,10 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<A />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/message" element={<MessageComponent />} />
-        <Route path="/user/:id" element={<PublicUserProfile />} />
+        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/message" element={<ProtectedRoute><MessageComponent /></ProtectedRoute>} />
+        <Route path="/user/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

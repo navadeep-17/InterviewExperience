@@ -69,7 +69,6 @@ const ProfilePage = () => {
   // --- ExperienceCard UI State ---
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const [expandedRounds, setExpandedRounds] = useState({});
-  const [editingExperienceId, setEditingExperienceId] = useState(null);
 
   // --- Comments State ---
   const [expandedComments, setExpandedComments] = useState({});
@@ -83,7 +82,7 @@ const ProfilePage = () => {
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyInputs, setReplyInputs] = useState({});
   const [collapsedComments, setCollapsedComments] = useState({});
-  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const highlightedCommentId = null;
 
   
   const avatarOptions = [
@@ -110,21 +109,33 @@ const ProfilePage = () => {
     const fetchUser = async () => {
       setLoading(true);
       const token = localStorage.getItem("authToken");
-      if (!token) return;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
       try {
         const res = await fetch(`${API_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          navigate('/login', { replace: true });
+          return;
+        }
         if (res.ok) {
           const user = await res.json();
           setUserData(user);
           setFormData(user);
         }
-      } catch (err) {}
-      setLoading(false);
+      } catch {
+        // A network failure must not discard the stored session.
+      } finally {
+        setLoading(false);
+      }
     };
     fetchUser();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -143,7 +154,7 @@ const ProfilePage = () => {
             setUserPosts(posts);
           }
         }
-      } catch (err) {
+      } catch {
         setUserPosts([]);
       }
       setPostsLoading(false);
@@ -165,7 +176,7 @@ const ProfilePage = () => {
             all[post._id] = comments;
             counts[post._id] = comments.length;
           }
-        } catch (err) {
+        } catch {
           all[post._id] = [];
           counts[post._id] = 0;
         }
@@ -205,7 +216,7 @@ const ProfilePage = () => {
       } else {
         setError("Failed to update profile.");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to update profile. Please try again.");
     }
     setSubmitting(false);
@@ -245,7 +256,7 @@ const ProfilePage = () => {
       if (res.ok) {
         setUserPosts((prev) => prev.filter((post) => post._id !== id));
       }
-    } catch (err) {
+    } catch {
       // Optionally set an error state
     }
   };
@@ -282,7 +293,7 @@ const ProfilePage = () => {
           [postId]: comments.length,
         }));
       }
-    } catch (err) {
+    } catch {
       // Optionally handle error
     }
     setCommentLoading(false);
@@ -317,7 +328,7 @@ const ProfilePage = () => {
         }
         await fetchComments(postId);
       }
-    } catch (err) {}
+    } catch { /* Keep existing state when the request fails. */ }
     setCommentLoading(false);
   };
 
@@ -346,7 +357,7 @@ const ProfilePage = () => {
         setEditingCommentText("");
         fetchComments(postId);
       }
-    } catch (err) {}
+    } catch { /* Keep existing state when the request fails. */ }
     setCommentLoading(false);
   };
 
@@ -363,7 +374,7 @@ const ProfilePage = () => {
       if (res.ok) {
         fetchComments(postId);
       }
-    } catch (err) {}
+    } catch { /* Keep existing state when the request fails. */ }
     setCommentLoading(false);
   };
 
@@ -387,7 +398,7 @@ const ProfilePage = () => {
         setReplyingTo(null);
         await fetchComments(postId);
       }
-    } catch (err) {}
+    } catch { /* Keep existing state when the request fails. */ }
     setCommentLoading(false);
   };
 
@@ -432,7 +443,7 @@ const ProfilePage = () => {
           )
         );
       }
-    } catch (err) {
+    } catch {
       alert('Failed to upvote');
     }
   };
@@ -457,7 +468,7 @@ const ProfilePage = () => {
           )
         );
       }
-    } catch (err) {
+    } catch {
       alert('Failed to downvote');
     }
   };

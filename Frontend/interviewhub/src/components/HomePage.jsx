@@ -9,7 +9,7 @@ import {
   User,
   X
 } from "lucide-react";
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExperienceCard from './ExperienceCard';
 
@@ -71,19 +71,16 @@ const HomePage = () => {
 
   const [voteLoading, setVoteLoading] = useState({});
 
-  const [showChat, setShowChat] = useState(false);
-  const [chatUser, setChatUser] = useState('');
-
   const [user, setUser] = useState(null);
 
   const navigate = useNavigate();
-  const handleContentAuthFailure = status => {
+  const handleContentAuthFailure = useCallback(status => {
     if (status === 401 || status === 403) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       navigate('/login', { replace: true });
     }
-  };
+  }, [navigate]);
 
   // Responsive sidebar
   useEffect(() => {
@@ -110,12 +107,12 @@ const HomePage = () => {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser(res.data);
-      } catch (err) {
-        // handle error, maybe redirect to login
+      } catch (error) {
+        handleContentAuthFailure(error.response?.status);
       }
     };
     fetchUser();
-  }, []);
+  }, [handleContentAuthFailure]);
 
   // Fetch comment counts for all experiences
   const fetchCommentCounts = async (exps) => {
@@ -186,16 +183,6 @@ const HomePage = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     navigate('/');
-  };
-
-  const openChat = (user) => {
-    setChatUser(user);
-    setShowChat(true);
-  };
-
-  const closeChat = () => {
-    setShowChat(false);
-    setChatUser('');
   };
 
   const handleFormChange = (e, roundIndex = null) => {
@@ -287,7 +274,7 @@ const HomePage = () => {
       await fetchCommentCounts([{ _id: expId }]);
       setHighlightedCommentId(res.data._id);
       setTimeout(() => setHighlightedCommentId(null), 1500);
-    } catch (err) {
+    } catch {
       alert('Failed to post comment');
     }
     setCommentLoading(prev => ({ ...prev, [expId]: false }));
@@ -332,7 +319,7 @@ const HomePage = () => {
       setEditingCommentText('');
       await fetchAllComments(expId);
       await fetchCommentCounts([{ _id: expId }]);
-    } catch (err) {
+    } catch {
       alert('Failed to update comment');
     }
   };
@@ -346,7 +333,7 @@ const HomePage = () => {
       );
       await fetchAllComments(expId);
       await fetchCommentCounts([{ _id: expId }]);
-    } catch (err) {
+    } catch {
       alert('Failed to delete comment');
     }
   };
@@ -406,7 +393,7 @@ const HomePage = () => {
           exp._id === expId ? { ...exp, upvotes: res.data.upvotes, downvotes: res.data.downvotes } : exp
         )
       );
-    } catch (err) {
+    } catch {
       alert('Failed to upvote');
     }
     setVoteLoading(prev => ({ ...prev, [expId]: false }));
@@ -426,7 +413,7 @@ const HomePage = () => {
           exp._id === expId ? { ...exp, upvotes: res.data.upvotes, downvotes: res.data.downvotes } : exp
         )
       );
-    } catch (err) {
+    } catch {
       alert('Failed to downvote');
     }
     setVoteLoading(prev => ({ ...prev, [expId]: false }));
@@ -935,4 +922,3 @@ const HomePage = () => {
 };
 
 export default HomePage;
-
