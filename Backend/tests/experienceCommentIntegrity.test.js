@@ -430,7 +430,7 @@ test('shared API client derives current auth and normalizes data/errors without 
 });
 
 test('frontend HTTP consumers centralize transport and public auth explicitly opts out', () => {
-  for (const file of ['A.jsx', 'HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx', 'Message.jsx']) {
+  for (const file of ['A.jsx', 'HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx', '../hooks/useMessaging.js']) {
     const source = fs.readFileSync(frontendPath(file), 'utf8');
     assert.match(source, /import \{[^}]*apiRequest[^}]*\} from ['"]\.\.\/services\/apiClient['"]/);
     assert.equal(/\bfetch\s*\(|\baxios\b|Authorization|VITE_API_URL/.test(source), false);
@@ -441,7 +441,7 @@ test('frontend HTTP consumers centralize transport and public auth explicitly op
     assert.match(auth, new RegExp("apiRequest\\('/api/auth/" + endpoint + "', \\{\\s*method: 'POST', auth: false"));
   }
   assert.ok(auth.includes("apiRequest('/api/auth/me')"));
-  const messages = fs.readFileSync(frontendPath('Message.jsx'), 'utf8');
+  const messages = fs.readFileSync(frontendPath('../hooks/useMessaging.js'), 'utf8');
   assert.ok(messages.includes('io(API_BASE_URL, { autoConnect: false })'));
   assert.ok(messages.includes('socket.auth = { token: authToken }'));
   const card = fs.readFileSync(frontendPath('ExperienceCard.jsx'), 'utf8');
