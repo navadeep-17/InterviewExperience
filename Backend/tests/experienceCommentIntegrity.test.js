@@ -487,17 +487,19 @@ test('login session validation preserves credentials on connectivity failures an
 for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx']) {
   test(file + ' authenticated content reads and nesting compatibility', async () => {
     const source = fs.readFileSync(frontendPath(file), 'utf8');
+    const feedSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('home/ExperienceFeed.jsx'), 'utf8') : source;
+    const dataSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8') : source;
     assert.ok(source.includes("import { apiRequest } from '../services/apiClient'"));
     assert.equal(/\bfetch\s*\(|\baxios\s*\.|Authorization|auth:\s*false/.test(source), false);
-    assert.ok(source.includes('const MAX_NESTING = 3;'));
-    assert.ok(source.includes('MAX_NESTING={MAX_NESTING}'));
-    assert.equal(source.includes('handleEditComment={() => {}}'), false);
-    assert.ok(source.includes('(commentId, commentText) =>'));
+    assert.ok(feedSource.includes('const MAX_NESTING = 3;'));
+    assert.ok(feedSource.includes('MAX_NESTING={MAX_NESTING}'));
+    assert.equal(feedSource.includes('handleEditComment={() => {}}'), false);
+    assert.ok(feedSource.includes('(commentId, commentText) =>'));
     if (file === 'HomePage.jsx') {
-      const gets = [...source.matchAll(/apiRequest\(([\s\S]*?)\);/g)].map(match => match[1])
+      const gets = [...dataSource.matchAll(/apiRequest\(([\s\S]*?)\);/g)].map(match => match[1])
         .filter(call => /api\/(experiences|comments)/.test(call) && !call.includes('method:'));
       assert.equal(gets.length, 3); gets.forEach(call => assert.equal(call.includes('auth: false'), false));
-      assert.equal((source.match(/handleContentAuthFailure\(err.status\)/g) || []).length, 3);
+      assert.equal((dataSource.match(/onAuthFailure\(err.status\)/g) || []).length, 3);
     } else {
       assert.equal(/await fetch\([^\n]+\/api\/(experiences\/user|comments\/experience)/.test(source), false);
       assert.equal((source.match(/await fetchContent\(/g) || []).length, 3);
@@ -513,14 +515,16 @@ for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx'])
       }
     }
     if (file !== 'PublicUserProfile.jsx') {
-      const helper = source.slice(source.indexOf('const experienceContent ='), source.indexOf('\n});', source.indexOf('const experienceContent =')) + 4);
+      const helper = dataSource.slice(dataSource.indexOf('const experienceContent ='), dataSource.indexOf('\n});', dataSource.indexOf('const experienceContent =')) + 4);
       const ctx = vm.createContext({}); vm.runInContext(helper + '\nglobalThis.pick = experienceContent;', ctx);
       const picked = ctx.pick({ ...content, ...protectedFields, rounds: [{ roundName: 'HR', user: b, _id: y }] });
       assert.deepEqual(Object.keys(picked).sort(), Object.keys(content).sort());
       assert.deepEqual(Object.keys(picked.rounds[0]).sort(), ['duration', 'questions', 'roundName']);
-      assert.ok(source.includes('experienceContent(editFormData)'));
-      assert.equal(source.includes('JSON.stringify(editFormData)'), false);
-      if (file === 'HomePage.jsx') { assert.ok(source.includes('experienceContent(formData)')); assert.equal(source.includes("department: ''"), false); }
+      assert.equal(dataSource.includes('JSON.stringify(editFormData)'), false);
+      if (file === 'HomePage.jsx') {
+        assert.equal((dataSource.match(/data: experienceContent\(formData\)/g) || []).length, 2);
+        assert.equal(helper.includes('department'), false);
+      } else assert.ok(source.includes('experienceContent(editFormData)'));
     }
   });
 }
@@ -532,4 +536,249 @@ test('CommentThread limits Reply control/input and uses consistent edit/save arg
   assert.ok(source.includes('handleEditCommentSave(expId, comment._id)'));
   const publicSource = fs.readFileSync(frontendPath('PublicUserProfile.jsx'), 'utf8');
   assert.ok(publicSource.includes('handleEditCommentSave={(postId, commentId) => handleEditCommentSave(commentId, postId)}'));
+});
+
+test('HomePage composes one feed hook and extracted UI without duplicating transport', () => {
+  const home = fs.readFileSync(frontendPath('HomePage.jsx'), 'utf8');
+  for (const component of ['ExperienceFilters', 'ExperienceFeed', 'ExperienceFormModal']) {
+    assert.ok(home.includes(`import ${component} from './home/${component}'`));
+    assert.ok(home.includes(`<${component} `));
+  }
+  assert.ok(home.includes("import useHomeExperiences from '../hooks/useHomeExperiences'"));
+  assert.equal((home.match(/useHomeExperiences\(/g) || []).length, 1);
+  assert.equal(/<form|\/api\/experiences|\/api\/comments|\/upvote|\/downvote/.test(home), false);
+  assert.ok(home.includes('onAuthFailure: handleContentAuthFailure'));
+  const hook = fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8');
+  assert.ok(hook.includes("import { apiRequest } from '../services/apiClient'"));
+  assert.equal(/\bfetch\s*\(|\baxios\b|VITE_API_URL|Authorization|auth:\s*false|localStorage|useNavigate/.test(hook), false);
+  for (const file of ['ExperienceFilters', 'ExperienceFeed', 'ExperienceFormModal']) {
+    const source = fs.readFileSync(frontendPath(`home/${file}.jsx`), 'utf8');
+    assert.equal(/apiRequest|useHomeExperiences|\bfetch\s*\(|\baxios\b|Authorization/.test(source), false);
+  }
+  const feed = fs.readFileSync(frontendPath('home/ExperienceFeed.jsx'), 'utf8');
+  for (const [prop, handler] of Object.entries({
+    handleEditExperience: 'onEditExperience', handleDeleteExperience: 'deleteExperience',
+    handleUpvote: 'upvote', handleDownvote: 'downvote', handleDeleteComment: 'deleteComment',
+    handlePostComment: 'handlePostComment', handleEditComment: 'handleEditComment',
+    handleEditCommentSave: 'handleEditCommentSave', toggleDescription: 'toggleDescription',
+    toggleRounds: 'toggleRounds', toggleComments: 'toggleComments',
+  })) assert.ok(feed.includes(`${prop}={${handler}}`));
+  assert.ok(feed.includes('editComment(expId, commentId, editingCommentText,'));
+});
+
+// Exercise the actual hook with mocked transport and a minimal state/effect scheduler.
+// This is intentionally isolated Node coverage, not a replacement for React/browser testing.
+function homeHookHarness(respond) {
+  const slots = []; const effects = []; const calls = []; const auth = []; const alerts = []; const confirmations = [];
+  let cursor = 0; let dirty = true; let current; let confirmResult = true;
+  const sameDeps = (a, b) => a && b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
+  const ctx = vm.createContext({
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
+      return [slots[index], next => {
+        const value = typeof next === 'function' ? next(slots[index]) : next;
+        if (!Object.is(value, slots[index])) { slots[index] = value; dirty = true; }
+      }];
+    },
+    useRef(initial) { const index = cursor++; return slots[index] || (slots[index] = { current: initial }); },
+    useCallback(fn, deps) {
+      const index = cursor++;
+      if (!sameDeps(slots[index]?.deps, deps)) slots[index] = { fn, deps };
+      return slots[index].fn;
+    },
+    useEffect(fn, deps) {
+      const index = cursor++;
+      if (!sameDeps(slots[index], deps)) { slots[index] = deps; effects.push(fn); }
+    },
+    apiRequest: async (url, options = {}) => { calls.push({ url, ...options }); return respond(url, options); },
+    alert: message => alerts.push(message), console: { error() {} },
+    window: { confirm: message => { confirmations.push(message); return confirmResult; } },
+  });
+  const source = fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8');
+  vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replace('export default ', '') + '\nglobalThis.mount = useHomeExperiences;', ctx);
+  const onAuthFailure = status => auth.push(status);
+  return {
+    calls, auth, alerts, confirmations,
+    get data() { return current; },
+    set confirm(value) { confirmResult = value; },
+    async flush() {
+      for (let turn = 0; turn < 30; turn++) {
+        if (dirty) { cursor = 0; dirty = false; current = ctx.mount({ onAuthFailure }); }
+        effects.splice(0).forEach(effect => effect());
+        await new Promise(done => setImmediate(done));
+        if (!dirty && effects.length === 0) return;
+      }
+      assert.fail('Home hook did not settle');
+    },
+  };
+}
+const feedReads = harness => harness.calls.filter(call => call.url === '/api/experiences' && !call.method);
+const plain = value => JSON.parse(JSON.stringify(value));
+function homeResponse(url, options) {
+  if (url.endsWith('/count')) return { count: 2 };
+  if (url.startsWith('/api/comments/experience/')) return [{ _id: root, text: 'comment' }];
+  if (options.method) return { _id: reply, upvotes: 7, downvotes: 1 };
+  return { experiences: [{ _id: options.params.page === 1 ? x : y, upvotes: 0, downvotes: 0 }], totalPages: 4 };
+}
+
+test('Home hook replaces page one, appends later pages, and preserves filter/search/sort behavior', async () => {
+  const h = homeHookHarness(homeResponse); await h.flush();
+  assert.deepEqual(plain(h.data.experiences.map(exp => exp._id)), [x]);
+  assert.equal(h.data.loading, false); assert.equal(h.data.totalPages, 4);
+  assert.deepEqual(plain(feedReads(h)[0].params), { page: 1, limit: 10, sortOrder: 'latest' });
+  const filters = { company: 'Example', role: 'Engineer', department: 'CSE', difficulty: 'Medium' };
+  h.data.setFilters(filters); await h.flush();
+  assert.equal(feedReads(h).length, 1, 'typing must not fetch');
+  h.data.loadMore(); await h.flush();
+  assert.equal(h.data.page, 2);
+  assert.deepEqual(plain(h.data.experiences.map(exp => exp._id)), [x, y]);
+  assert.deepEqual(plain(feedReads(h).at(-1).params), { page: 2, limit: 10, ...filters, sortOrder: 'latest' });
+  h.data.setSortOrder('oldest'); await h.flush();
+  assert.equal(h.data.page, 2, 'sort retains the current page');
+  assert.equal(feedReads(h).at(-1).params.sortOrder, 'oldest');
+  assert.equal(feedReads(h).at(-1).params.page, 2);
+  assert.deepEqual(plain(h.data.experiences.map(exp => exp._id)), [x, y, y]);
+  await h.data.search({ company: 'Changed' }); await h.flush();
+  assert.equal(h.data.page, 1);
+  assert.deepEqual(plain(h.data.experiences.map(exp => exp._id)), [x]);
+  assert.deepEqual(plain(feedReads(h).at(-1).params), { page: 1, limit: 10, company: 'Changed', sortOrder: 'oldest' });
+});
+
+test('Home create/update/delete refresh page one, allowlist content, and retain delete confirmation', async () => {
+  const h = homeHookHarness(homeResponse); await h.flush();
+  const draft = { ...content, ...protectedFields, rounds: [{ roundName: 'HR', questions: 'Why?', duration: '30', user: b, _id: y }] };
+  for (const action of ['createExperience', 'updateExperience', 'deleteExperience']) {
+    h.data.loadMore(); await h.flush();
+    const before = h.calls.length;
+    const result = await (action === 'createExperience' ? h.data[action](draft) : h.data[action](x, draft));
+    await h.flush();
+    if (action !== 'deleteExperience') assert.equal(result, true);
+    assert.equal(h.data.page, 1);
+    assert.deepEqual(plain(h.data.experiences.map(exp => exp._id)), [x]);
+    assert.ok(h.calls.slice(before).some(call => call.params?.page === 1));
+    const write = h.calls.slice(before).find(call => call.method);
+    assert.equal(write.url, action === 'createExperience' ? '/api/experiences' : `/api/experiences/${x}`);
+    assert.equal(write.method, { createExperience: 'POST', updateExperience: 'PUT', deleteExperience: 'DELETE' }[action]);
+    if (write.method !== 'DELETE') {
+      assert.deepEqual(Object.keys(write.data).sort(), Object.keys(content).sort());
+      assert.deepEqual(plain(write.data.rounds), [{ roundName: 'HR', questions: 'Why?', duration: '30' }]);
+      for (const field of Object.keys(protectedFields)) assert.equal(field in write.data, false);
+    }
+  }
+  assert.deepEqual(h.confirmations, ['Are you sure you want to delete this experience?']);
+  h.confirm = false; const before = h.calls.length;
+  await h.data.deleteExperience(x); await h.flush();
+  assert.equal(h.calls.length, before);
+});
+
+test('Home votes update only the target counts and preserve per-experience loading and empty payloads', async () => {
+  let release;
+  const h = homeHookHarness((url, options) => options.method ? new Promise(resolve => { release = resolve; }) : homeResponse(url, options));
+  await h.flush(); h.data.loadMore(); await h.flush();
+  for (const action of ['upvote', 'downvote']) {
+    const untouched = h.data.experiences[1];
+    const pending = h.data[action](x); await h.flush();
+    assert.equal(h.data.voteLoading[x], true); assert.equal(h.data.voteLoading[y], undefined);
+    const write = h.calls.findLast(call => call.method);
+    assert.equal(write.url, `/api/experiences/${x}/${action}`);
+    assert.equal(write.method, 'POST'); assert.deepEqual(plain(write.data), {});
+    release({ upvotes: 7, downvotes: 1 }); await pending; await h.flush();
+    assert.equal(h.data.voteLoading[x], false);
+    assert.equal(h.data.experiences[0].upvotes, 7); assert.equal(h.data.experiences[0].downvotes, 1);
+    assert.equal(h.data.experiences[1], untouched);
+  }
+});
+
+test('Home root/reply/edit/delete comment mutations refresh comments and count with content-only payloads', async () => {
+  const h = homeHookHarness(homeResponse); await h.flush();
+  for (const action of ['root', 'reply', 'edit', 'delete']) {
+    let cleared = false; const before = h.calls.length;
+    const clear = () => { cleared = true; assert.equal(h.calls.length, before + 1, 'clear draft after write, before refresh'); };
+    if (action === 'root' || action === 'reply') {
+      const pending = h.data.postComment(x, 'draft', action === 'reply' ? root : null, clear);
+      await h.flush(); assert.equal((await pending)._id, reply);
+    } else if (action === 'edit') await h.data.editComment(x, root, 'edited', clear);
+    else await h.data.deleteComment(x, root);
+    await h.flush();
+    const calls = h.calls.slice(before);
+    assert.deepEqual(calls.map(call => call.url), [
+      ['root', 'reply'].includes(action) ? '/api/comments' : `/api/comments/${root}`,
+      `/api/comments/experience/${x}`, `/api/comments/experience/${x}/count`,
+    ]);
+    assert.equal(calls[0].method, { root: 'POST', reply: 'POST', edit: 'PUT', delete: 'DELETE' }[action]);
+    if (['root', 'reply'].includes(action)) assert.deepEqual(plain(calls[0].data), { experienceId: x, text: 'draft', parentCommentId: action === 'root' ? null : root });
+    if (action === 'edit') assert.deepEqual(plain(calls[0].data), { text: 'edited' });
+    assert.equal(cleared, action !== 'delete');
+    assert.equal(h.data.commentCounts[x], 2);
+    assert.equal(h.data.allComments[x][0]._id, root);
+    assert.equal(h.data.commentLoading[x], false);
+  }
+});
+
+test('Home malformed read responses remain bounded with safe array/count fallbacks', async () => {
+  for (const response of [null, {}, { experiences: {} }]) {
+    const h = homeHookHarness(() => response); await h.flush();
+    assert.equal(h.data.error, 'Failed to load experiences.');
+    assert.equal(h.data.loading, false); assert.deepEqual(plain(h.data.experiences), []);
+  }
+  for (const count of [-1, 1.5, '2', Number.MAX_SAFE_INTEGER + 1, null]) {
+    const h = homeHookHarness((url, options) => url.endsWith('/count') ? { count }
+      : url.startsWith('/api/comments/experience/') ? { comments: [] } : homeResponse(url, options));
+    await h.flush();
+    assert.equal(h.data.error, null); assert.equal(h.data.commentCounts[x], 0);
+    assert.deepEqual(plain(h.data.allComments[x]), []);
+  }
+});
+
+test('Home read failures delegate status and retain the page-owned 401/403 logout policy', async () => {
+  for (const endpoint of ['/api/experiences', `/api/comments/experience/${x}`, `/api/comments/experience/${x}/count`]) {
+    for (const status of [401, 403, 500, undefined]) {
+      const h = homeHookHarness((url, options) => { if (url === endpoint) throw { status }; return homeResponse(url, options); });
+      await h.flush(); assert.deepEqual(h.auth, [status]);
+    }
+  }
+  const home = fs.readFileSync(frontendPath('HomePage.jsx'), 'utf8');
+  const start = home.indexOf('  const handleContentAuthFailure =');
+  const policy = home.slice(start, home.indexOf('  }, [navigate]);', start) + '  }, [navigate]);'.length);
+  for (const status of [401, 403, 500, undefined]) {
+    const removed = []; const redirects = [];
+    const ctx = vm.createContext({ useCallback: fn => fn, localStorage: { removeItem: key => removed.push(key) }, navigate: (...args) => redirects.push(args) });
+    vm.runInContext(policy + '\nglobalThis.fail = handleContentAuthFailure;', ctx); ctx.fail(status);
+    assert.deepEqual(removed, [401, 403].includes(status) ? ['authToken', 'user'] : []);
+    assert.equal(redirects.length, [401, 403].includes(status) ? 1 : 0);
+    if (redirects.length) { assert.equal(redirects[0][0], '/login'); assert.equal(redirects[0][1].replace, true); }
+  }
+});
+
+test('Home failed writes keep existing alerts, drafts, and mutation auth policy without refresh', async () => {
+  const h = homeHookHarness((url, options) => { if (options.method) throw { status: 401 }; return homeResponse(url, options); });
+  await h.flush(); const readsBefore = h.calls.length; let cleared = false;
+  assert.equal(await h.data.createExperience(content), false);
+  assert.equal(await h.data.updateExperience(x, content), false);
+  await h.data.deleteExperience(x);
+  assert.equal(await h.data.postComment(x, 'draft', null, () => { cleared = true; }), null);
+  await h.data.editComment(x, root, 'draft', () => { cleared = true; });
+  await h.data.deleteComment(x, root); await h.data.upvote(x); await h.data.downvote(x); await h.flush();
+  assert.equal(cleared, false); assert.deepEqual(h.auth, []);
+  assert.equal(h.calls.length, readsBefore + 8);
+  assert.equal(h.data.commentLoading[x], false); assert.equal(h.data.voteLoading[x], false);
+  assert.deepEqual(h.alerts, ['Failed to post experience', 'Failed to update experience', 'Failed to delete experience',
+    'Failed to post comment', 'Failed to update comment', 'Failed to delete comment', 'Failed to upvote', 'Failed to downvote']);
+});
+
+test('Home modal drafts start clean and edit rounds cannot alias the selected feed experience', () => {
+  const source = fs.readFileSync(frontendPath('home/ExperienceFormModal.jsx'), 'utf8');
+  const helpers = source.slice(source.indexOf('const blankDraft'), source.indexOf('export default'));
+  const ctx = vm.createContext({}); vm.runInContext(helpers + '\nglobalThis.blank = blankDraft; globalThis.edit = editDraft;', ctx);
+  const first = ctx.blank(); const second = ctx.blank();
+  first.rounds[0].questions = 'new question'; assert.equal(second.rounds[0].questions, '');
+  assert.deepEqual(Object.keys(second).sort(), Object.keys(content).sort());
+  const selected = { ...content, ...protectedFields, roundDate: '2026-09-01T00:00:00.000Z', rounds: [{ roundName: 'HR', questions: 'Original', duration: '30' }] };
+  const draft = ctx.edit(selected); draft.rounds[0].questions = 'Unsaved';
+  assert.equal(selected.rounds[0].questions, 'Original');
+  assert.deepEqual(Object.keys(draft).sort(), Object.keys(content).sort());
+  assert.ok(source.includes("new Date(formData.roundDate).toISOString().slice(0, 10)"));
+  assert.ok(source.includes("required={mode === 'create'}"));
+  assert.ok(source.includes("if (mode === 'create') setFormData(blankDraft())"));
 });
