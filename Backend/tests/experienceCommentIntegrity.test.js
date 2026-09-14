@@ -487,8 +487,8 @@ test('login session validation preserves credentials on connectivity failures an
 for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx']) {
   test(file + ' authenticated content reads and nesting compatibility', async () => {
     const source = fs.readFileSync(frontendPath(file), 'utf8');
-    const feedSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('home/ExperienceFeed.jsx'), 'utf8') : source;
-    const dataSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8') : source;
+    const feedSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('home/ExperienceFeed.jsx'), 'utf8') : fs.readFileSync(frontendPath('profile/ProfileExperienceFeed.jsx'), 'utf8');
+    const dataSource = file === 'HomePage.jsx' ? fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8') : fs.readFileSync(frontendPath('../hooks/useProfileExperiences.js'), 'utf8');
     assert.ok(source.includes("import { apiRequest } from '../services/apiClient'"));
     assert.equal(/\bfetch\s*\(|\baxios\s*\.|Authorization|auth:\s*false/.test(source), false);
     assert.ok(feedSource.includes('const MAX_NESTING = 3;'));
@@ -501,14 +501,16 @@ for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx'])
       assert.equal(gets.length, 3); gets.forEach(call => assert.equal(call.includes('auth: false'), false));
       assert.equal((dataSource.match(/onAuthFailure\(err.status\)/g) || []).length, 3);
     } else {
-      assert.equal(/await fetch\([^\n]+\/api\/(experiences\/user|comments\/experience)/.test(source), false);
-      assert.equal((source.match(/await fetchContent\(/g) || []).length, 3);
-      const helper = source.slice(source.indexOf('  const fetchContent ='), source.indexOf('\n  };', source.indexOf('  const fetchContent =')) + 5);
+      assert.equal(/\/api\/(experiences|comments)/.test(source), false);
+      const begin = source.indexOf('  const handleContentAuthFailure =');
+      const policy = source.slice(begin, source.indexOf('  }, [navigate]);', begin) + '  }, [navigate]);'.length);
+      const readStart = dataSource.indexOf('  const readContent =');
+      const helper = dataSource.slice(readStart, dataSource.indexOf('  }, [onAuthFailure]);', readStart) + '  }, [onAuthFailure]);'.length);
       for (const status of [200, 401, 403, 500, undefined]) {
         const removed = []; const redirects = [];
-        const ctx = vm.createContext({ localStorage: { getItem: () => 'fixture', removeItem: key => removed.push(key) }, navigate: (...args) => redirects.push(args),
+        const ctx = vm.createContext({ useCallback: fn => fn, localStorage: { removeItem: key => removed.push(key) }, navigate: (...args) => redirects.push(args),
           apiRequest: async url => { assert.equal(url, '/fixture'); if (status !== 200) throw { status }; return ['parsed-content']; } });
-        vm.runInContext(helper + '\nglobalThis.read = fetchContent;', ctx);
+        vm.runInContext(policy + '\nconst onAuthFailure = handleContentAuthFailure;\n' + helper + '\nglobalThis.read = readContent;', ctx);
         if (status === 200) await ctx.read('/fixture'); else await assert.rejects(ctx.read('/fixture'));
         assert.equal(removed.length, [401, 403].includes(status) ? 2 : 0);
         if (removed.length) { assert.equal(redirects[0][0], '/login'); assert.equal(redirects[0][1].replace, true); }
@@ -524,7 +526,7 @@ for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx'])
       if (file === 'HomePage.jsx') {
         assert.equal((dataSource.match(/data: experienceContent\(formData\)/g) || []).length, 2);
         assert.equal(helper.includes('department'), false);
-      } else assert.ok(source.includes('experienceContent(editFormData)'));
+      } else assert.ok(dataSource.includes('experienceContent(editFormData)'));
     }
   });
 }
@@ -534,8 +536,9 @@ test('CommentThread limits Reply control/input and uses consistent edit/save arg
   assert.ok(source.includes('{level + 1 < MAX_NESTING && replyingTo === comment._id'));
   assert.ok(source.includes('handleEditComment(comment._id, comment.text)'));
   assert.ok(source.includes('handleEditCommentSave(expId, comment._id)'));
-  const publicSource = fs.readFileSync(frontendPath('PublicUserProfile.jsx'), 'utf8');
-  assert.ok(publicSource.includes('handleEditCommentSave={(postId, commentId) => handleEditCommentSave(commentId, postId)}'));
+  const profileFeed = fs.readFileSync(frontendPath('profile/ProfileExperienceFeed.jsx'), 'utf8');
+  assert.ok(profileFeed.includes('handleEditCommentSave={handleEditCommentSave}'));
+  assert.ok(profileFeed.includes('data.editComment(postId, commentId, editingCommentText,'));
 });
 
 test('HomePage composes one feed hook and extracted UI without duplicating transport', () => {
@@ -568,8 +571,8 @@ test('HomePage composes one feed hook and extracted UI without duplicating trans
 
 // Exercise the actual hook with mocked transport and a minimal state/effect scheduler.
 // This is intentionally isolated Node coverage, not a replacement for React/browser testing.
-function homeHookHarness(respond) {
-  const slots = []; const effects = []; const calls = []; const auth = []; const alerts = []; const confirmations = [];
+function homeHookHarness(respond, configuration = {}) {
+  const slots = []; const effects = []; const calls = []; const auth = []; const alerts = []; const confirmations = []; const fatal = [];
   let cursor = 0; let dirty = true; let current; let confirmResult = true;
   const sameDeps = (a, b) => a && b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
   const ctx = vm.createContext({
@@ -595,16 +598,18 @@ function homeHookHarness(respond) {
     alert: message => alerts.push(message), console: { error() {} },
     window: { confirm: message => { confirmations.push(message); return confirmResult; } },
   });
-  const source = fs.readFileSync(frontendPath('../hooks/useHomeExperiences.js'), 'utf8');
-  vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replace('export default ', '') + '\nglobalThis.mount = useHomeExperiences;', ctx);
+  const source = fs.readFileSync(frontendPath(configuration.source || '../hooks/useHomeExperiences.js'), 'utf8');
+  vm.runInContext(source.replace(/^import .*;\r?\n/gm, '').replace('export default ', '') + '\nglobalThis.mount = ' + (configuration.name || 'useHomeExperiences') + ';', ctx);
   const onAuthFailure = status => auth.push(status);
+  let props = { ...configuration.props, onAuthFailure, onFatalReadFailure: () => fatal.push(true) };
   return {
-    calls, auth, alerts, confirmations,
+    calls, auth, alerts, confirmations, fatal,
+    setProps(next) { props = { ...props, ...next }; dirty = true; },
     get data() { return current; },
     set confirm(value) { confirmResult = value; },
     async flush() {
       for (let turn = 0; turn < 30; turn++) {
-        if (dirty) { cursor = 0; dirty = false; current = ctx.mount({ onAuthFailure }); }
+        if (dirty) { cursor = 0; dirty = false; current = ctx.mount(props); }
         effects.splice(0).forEach(effect => effect());
         await new Promise(done => setImmediate(done));
         if (!dirty && effects.length === 0) return;
@@ -781,4 +786,284 @@ test('Home modal drafts start clean and edit rounds cannot alias the selected fe
   assert.ok(source.includes("new Date(formData.roundDate).toISOString().slice(0, 10)"));
   assert.ok(source.includes("required={mode === 'create'}"));
   assert.ok(source.includes("if (mode === 'create') setFormData(blankDraft())"));
+});
+
+const profileFixture = { _id: a, name: 'Viewed author', department: 'CSE' };
+const profileSource = file => fs.readFileSync(frontendPath(file), 'utf8');
+const profileResponse = (url, options) => {
+  if (options.method) return { _id: x, ...content, upvotes: 5, downvotes: 2, user: { _id: b } };
+  if (url.startsWith('/api/experiences/user/')) return [{ _id: x, ...content }, { _id: y, ...content }];
+  return [{ _id: root, experienceId: x, text: 'comment' }];
+};
+async function profileHarness(mode = 'own', respond = profileResponse) {
+  const h = homeHookHarness(respond, { source: '../hooks/useProfileExperiences.js', name: 'useProfileExperiences', props: { profileUser: profileFixture, mode } });
+  await h.flush();
+  if (mode === 'public') { await h.data.loadExperiences(profileFixture); await h.flush(); }
+  return h;
+}
+
+test('profile architecture shares feed/state, preserves viewer identity, and keeps page-specific transport', () => {
+  for (const file of ['ProfilePage.jsx', 'PublicUserProfile.jsx']) {
+    const source = profileSource(file);
+    assert.ok(source.includes("import useProfileExperiences from '../hooks/useProfileExperiences'"));
+    assert.ok(source.includes("import ProfileExperienceFeed from './profile/ProfileExperienceFeed'"));
+    assert.ok(source.includes('<ProfileExperienceFeed '));
+    assert.equal(/<ExperienceCard|MAX_NESTING|\/api\/comments|\/api\/experiences|expandedDescriptions|editingCommentId|buildCommentTree|handlePostComment|handleUpvote/.test(source), false);
+  }
+  const own = profileSource('ProfilePage.jsx'); const publicPage = profileSource('PublicUserProfile.jsx');
+  assert.ok(own.includes('viewer={userData}')); assert.ok(publicPage.includes('viewer={currentUser}'));
+  assert.ok(publicPage.includes('profileUser: userInfo')); assert.ok(own.includes('profileUser: userData'));
+  assert.ok(publicPage.includes('await loadExperiences(userData)'));
+  assert.ok(publicPage.includes('useCallback(() => setUserInfo(null), [])'));
+  const hook = profileSource('../hooks/useProfileExperiences.js');
+  assert.ok(hook.includes("import { apiRequest } from '../services/apiClient'"));
+  assert.equal(/\bfetch\s*\(|\baxios\b|Authorization|VITE_API_URL|auth:\s*false|localStorage|useNavigate|useParams|\/api\/auth\/me|\/api\/users\/|\/count/.test(hook), false);
+  const feed = profileSource('profile/ProfileExperienceFeed.jsx');
+  assert.ok(feed.includes("import ExperienceCard from '../ExperienceCard'"));
+  assert.ok(feed.includes('user={viewer}'));
+  assert.ok(feed.includes("handleEditExperience={mode === 'own' ? onEditExperience : undefined}"));
+  assert.ok(feed.includes("handleDeleteExperience={mode === 'own' ? data.deleteExperience : undefined}"));
+  assert.ok(feed.includes("voteLoading={mode === 'own' ? false : data.voteLoading[post._id]}"));
+  assert.equal(/apiRequest|\bfetch\s*\(|\baxios\b|localStorage|react-router|parentName|setHighlightedCommentId/.test(feed), false);
+});
+
+for (const mode of ['own', 'public']) {
+  test('profile ' + mode + ' loads author-mapped experiences and derives counts from validated comment arrays', async () => {
+    const h = await profileHarness(mode);
+    assert.equal(h.calls.filter(c => c.url === `/api/experiences/user/${a}`).length, 1);
+    assert.equal(h.calls.filter(c => c.url.startsWith('/api/comments/experience/')).length, 2);
+    assert.equal(h.data.experiences[0].user, profileFixture);
+    assert.equal(h.data.postsLoading, false); assert.equal(h.data.commentCounts[x], 1); assert.equal(h.data.commentCounts[y], 1);
+    assert.equal(typeof h.data.commentLoading, 'boolean'); assert.deepEqual(h.fatal, []);
+    const before = h.calls.length; h.setProps({ profileUser: { ...profileFixture, name: 'Updated' } }); await h.flush();
+    assert.equal(h.calls.length, before, 'profile details changes alone do not reload experiences');
+  });
+
+  for (const kind of ['experience', 'comment']) {
+    test('profile ' + mode + ' preserves initial ' + kind + ' failure semantics', async () => {
+      for (const malformed of [false, true]) {
+        const h = await profileHarness(mode, (url, options) => {
+          if ((kind === 'experience' && url.startsWith('/api/experiences/user/')) || (kind === 'comment' && url.endsWith('/' + x))) {
+            if (malformed) return { invalid: [] };
+            throw { status: 500 };
+          }
+          return profileResponse(url, options);
+        });
+        assert.equal(h.data.postsLoading, false);
+        if (mode === 'public') { assert.equal(h.fatal.length, 1); assert.deepEqual(plain(h.data.experiences), []); }
+        else {
+          assert.deepEqual(h.fatal, []);
+          assert.equal(h.data.experiences.length, kind === 'experience' ? 0 : 2);
+          if (kind === 'comment') { assert.deepEqual(plain(h.data.allComments[x]), []); assert.equal(h.data.commentCounts[x], 0); assert.equal(h.data.commentCounts[y], 1); }
+        }
+      }
+    });
+  }
+}
+
+test('profile protected reads delegate status while malformed refresh preserves loaded comments', async () => {
+  for (const target of [`/api/experiences/user/${a}`, `/api/comments/experience/${x}`]) {
+    for (const status of [401, 403, undefined]) {
+      const h = await profileHarness('own', (url, options) => { if (url === target) throw { status }; return profileResponse(url, options); });
+      assert.deepEqual(h.auth, [status]); assert.deepEqual(h.fatal, []);
+    }
+  }
+  let malformed = false;
+  const h = await profileHarness('public', (url, options) => malformed && url.startsWith('/api/comments/') ? {} : profileResponse(url, options));
+  const before = h.data.allComments[x]; malformed = true;
+  await h.data.fetchComments(x); await h.flush();
+  assert.equal(h.data.allComments[x], before); assert.equal(h.data.commentCounts[x], 1); assert.deepEqual(h.fatal, []);
+});
+
+for (const mode of ['own', 'public']) {
+  test('profile ' + mode + ' comment writes preserve payloads, draft callbacks and refresh timing', async () => {
+    let reject = false; let defer; let hold = false;
+    const h = await profileHarness(mode, (url, options) => {
+      if (options.method && hold) return new Promise(resolve => { defer = resolve; });
+      if (options.method && reject) throw { status: 401 };
+      return profileResponse(url, options);
+    });
+    for (const action of ['root', 'reply', 'edit', 'delete']) {
+      for (reject of [true, false]) {
+        const before = h.calls.length; let cleared = false;
+        const clear = () => { cleared = true; assert.equal(h.calls.length, before + 1); };
+        if (action === 'root' || action === 'reply') await h.data.postComment(x, ' draft ', action === 'reply' ? root : undefined, clear);
+        else if (action === 'edit') await h.data.editComment(x, root, ' edited ', clear);
+        else await h.data.deleteComment(x, root);
+        await h.flush();
+        const calls = h.calls.slice(before); assert.equal(calls.length, reject ? 1 : 2);
+        assert.equal(cleared, !reject && action !== 'delete');
+        const write = calls[0]; assert.equal(write.url, ['root', 'reply'].includes(action) ? '/api/comments' : `/api/comments/${root}`);
+        assert.equal(write.method, { root: 'POST', reply: 'POST', edit: 'PUT', delete: 'DELETE' }[action]);
+        if (action === 'root') assert.deepEqual(plain(write.data), { text: 'draft', experienceId: x });
+        if (action === 'reply') assert.deepEqual(plain(write.data), { text: 'draft', experienceId: x, parentCommentId: root });
+        if (action === 'edit') assert.deepEqual(plain(write.data), { text: 'edited' });
+        if (!reject) assert.equal(calls[1].url, `/api/comments/experience/${x}`);
+        assert.equal(h.data.commentLoading, false); assert.deepEqual(h.auth, []);
+      }
+    }
+    const before = h.calls.length;
+    await h.data.postComment(x, '  ', undefined, () => assert.fail('empty draft cleared'));
+    await h.data.editComment(x, root, ' ', () => assert.fail('empty editor cleared'));
+    assert.equal(h.calls.length, before);
+    hold = true; const pending = h.data.postComment(x, 'held', undefined, () => {}); await h.flush();
+    assert.equal(h.data.commentLoading, true); defer({}); await pending; await h.flush(); assert.equal(h.data.commentLoading, false);
+  });
+
+  test('profile ' + mode + ' vote payload, target update, error and loading differences remain', async () => {
+    let release; let failure;
+    const h = await profileHarness(mode, (url, options) => {
+      if (options.method) return new Promise((resolve, reject) => { release = () => failure ? reject(failure) : resolve({ upvotes: 7, downvotes: 2 }); });
+      return profileResponse(url, options);
+    });
+    for (const action of ['upvote', 'downvote']) {
+      const other = h.data.experiences[1]; const pending = h.data[action](x); await h.flush();
+      assert.equal(h.data.voteLoading[x], mode === 'public' ? true : undefined);
+      const write = h.calls.findLast(c => c.method);
+      assert.equal(write.url, `/api/experiences/${x}/${action}`); assert.equal(write.method, 'POST'); assert.equal(write.data, undefined);
+      release(); await pending; await h.flush();
+      assert.equal(h.data.experiences[0].upvotes, 7); assert.equal(h.data.experiences[0].downvotes, 2); assert.equal(h.data.experiences[1], other);
+      assert.equal(h.data.voteLoading[x], mode === 'public' ? false : undefined);
+      for (const status of [401, 403, undefined]) {
+        failure = { status }; const alertsBefore = h.alerts.length; const previous = h.data.experiences[0];
+        const failed = h.data[action](x); release(); await failed; await h.flush();
+        assert.equal(h.alerts.length, alertsBefore + (mode === 'own' && status === undefined ? 1 : 0));
+        if (mode === 'own' && status === undefined) assert.equal(h.alerts.at(-1), 'Failed to ' + action);
+        assert.equal(h.data.experiences[0], previous); assert.deepEqual(h.auth, []);
+      }
+      failure = undefined;
+    }
+  });
+}
+
+test('own profile experience delete confirms and removes only after success without a list refetch', async () => {
+  let failure = true;
+  const h = await profileHarness('own', (url, options) => { if (options.method && failure) throw { status: 403 }; return profileResponse(url, options); });
+  h.confirm = false; const before = h.calls.length; await h.data.deleteExperience(x); await h.flush(); assert.equal(h.calls.length, before);
+  assert.equal(h.confirmations[0], 'Are you sure you want to delete this post?');
+  h.confirm = true; await h.data.deleteExperience(x); await h.flush(); assert.equal(h.data.experiences.length, 2);
+  failure = false; await h.data.deleteExperience(x); await h.flush();
+  assert.deepEqual(plain(h.data.experiences.map(p => p._id)), [y]); assert.deepEqual(h.auth, []);
+  assert.equal(h.calls.filter(c => c.url === `/api/experiences/user/${a}`).length, 1);
+  assert.ok(h.calls.some(c => c.url === `/api/experiences/${x}` && c.method === 'DELETE'));
+});
+
+test('own profile experience update allowlists fields, preserves failures and replaces only the response target', async () => {
+  let failure = true;
+  const h = await profileHarness('own', (url, options) => { if (options.method && failure) throw { status: 403 }; return profileResponse(url, options); });
+  const draft = { ...content, ...protectedFields, rounds: [{ roundName: 'HR', questions: 'Why?', duration: '30', _id: root, user: b }] };
+  const original = h.data.experiences[0]; const other = h.data.experiences[1];
+  assert.equal(await h.data.updateExperience(x, draft), false); await h.flush();
+  assert.equal(h.data.experiences[0], original); assert.deepEqual(h.alerts, ['Failed to update experience']);
+  failure = false; assert.equal(await h.data.updateExperience(x, draft), true); await h.flush();
+  assert.equal(h.data.experiences[0].user, profileFixture); assert.equal(h.data.experiences[1], other);
+  const write = h.calls.find(c => c.method === 'PUT'); assert.equal(write.url, `/api/experiences/${x}`);
+  assert.deepEqual(Object.keys(write.data).sort(), Object.keys(content).sort());
+  assert.deepEqual(plain(write.data.rounds), [{ roundName: 'HR', questions: 'Why?', duration: '30' }]);
+  for (const key of Object.keys(protectedFields)) assert.equal(key in write.data, false);
+  assert.deepEqual(h.auth, []);
+  const publicHook = await profileHarness('public'); const before = publicHook.calls.length;
+  assert.equal(await publicHook.data.updateExperience(x, draft), false); await publicHook.data.deleteExperience(x);
+  assert.equal(publicHook.calls.length, before);
+});
+
+test('shared profile feed preserves tree/sort, draft callbacks, expansion and normalized comment signatures', async () => {
+  const source = profileSource('profile/ProfileExperienceFeed.jsx');
+  const prefix = source.replace(/^import .*;\r?\n/gm, '').replace('export default ', '').split("  if (mode === 'own' && postsLoading)")[0];
+  let slots = []; let cursor = 0; let allowWrite = false; const calls = [];
+  const ctx = vm.createContext({ useEffect: fn => fn(), useState: initial => {
+    const index = cursor++; if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
+    return [slots[index], next => { slots[index] = typeof next === 'function' ? next(slots[index]) : next; }];
+  } });
+  vm.runInContext(prefix + '\nreturn { buildCommentTree, sortedComments, handlePostComment, handlePostReply, handleEditComment, handleEditCommentSave, toggleComments, toggleDescription, toggleRounds, setCommentInputs, setReplyInputs, setReplyingTo, commentInputs, replyInputs, replyingTo, editingCommentId, editingCommentText, expandedDescriptions, expandedRounds }; }\nglobalThis.mount = ProfileExperienceFeed;', ctx);
+  const data = { allComments: {}, fetchComments: id => calls.push(['read', id]),
+    postComment: async (...args) => { calls.push(args.slice(0,3)); if (allowWrite) args[3](); },
+    editComment: async (...args) => { calls.push(args.slice(0,3)); if (allowWrite) args[3](); } };
+  const retainedState = { current: null };
+  const render = (mode, retain = false) => { cursor = 0; return ctx.mount({ data, mode, viewer: { _id: b }, retainedState: retain ? retainedState : undefined }); };
+  let feed = render('own');
+  const comments = [{ _id: root, createdAt: '2026-01-01' }, { _id: reply, parentCommentId: root, createdAt: '2026-01-02' }];
+  const sorted = feed.sortedComments(comments); assert.equal(sorted[0]._id, reply); assert.equal(comments[0]._id, root);
+  const tree = feed.buildCommentTree(sorted); assert.equal(tree[0].replies[0]._id, reply); assert.equal('parentName' in tree[0].replies[0], false);
+  assert.deepEqual(plain(feed.buildCommentTree(null)), []);
+  feed.toggleDescription(x); feed.toggleRounds(y); feed.toggleComments(x); feed = render('own');
+  assert.equal(feed.expandedDescriptions[x], true); assert.equal(feed.expandedRounds[y], true); assert.deepEqual(calls.pop(), ['read', x]);
+  slots = []; feed = render('public'); feed.toggleComments(x); assert.equal(calls.length, 0);
+  feed.setCommentInputs({ [x]: 'root draft' }); feed.setReplyInputs({ [root]: 'reply draft' }); feed.setReplyingTo(root); feed.handleEditComment(reply, 'edit draft'); feed = render('own');
+  await feed.handlePostComment(x); await feed.handlePostReply(x, root); await feed.handleEditCommentSave(x, reply); feed = render('own');
+  assert.equal(feed.commentInputs[x], 'root draft'); assert.equal(feed.replyInputs[root], 'reply draft'); assert.equal(feed.editingCommentId, reply);
+  const beforeEmptyReply = calls.length;
+  await feed.handlePostReply(x, 'missing-reply');
+  assert.equal(calls[beforeEmptyReply][1], '', 'an absent reply must not reuse the top-level draft');
+  allowWrite = true;
+  await feed.handlePostComment(x); await feed.handlePostReply(x, root); await feed.handleEditCommentSave(x, reply); feed = render('own');
+  assert.equal(feed.commentInputs[x], ''); assert.equal(feed.replyInputs[root], ''); assert.equal(feed.replyingTo, null); assert.equal(feed.editingCommentId, null); assert.equal(feed.editingCommentText, '');
+  assert.deepEqual(calls.at(-1), [x, reply, 'edit draft']);
+  feed = render('public', true);
+  feed.setCommentInputs({ [x]: 'retained draft' }); feed.toggleDescription(x);
+  feed = render('public', true);
+  const expandedBeforeUnmount = feed.expandedDescriptions[x];
+  slots = []; feed = render('public', true);
+  assert.equal(feed.commentInputs[x], 'retained draft');
+  assert.equal(feed.expandedDescriptions[x], expandedBeforeUnmount);
+  assert.ok(profileSource('PublicUserProfile.jsx').includes('retainedState={feedState}'));
+  for (const text of ['MAX_NESTING = 3', 'MAX_NESTING={MAX_NESTING}', 'handleDeleteComment={data.deleteComment}', 'handleEditCommentSave={handleEditCommentSave}', 'highlightedCommentId = null']) assert.ok(source.includes(text));
+});
+
+for (const own of [true, false]) {
+  test((own ? 'own' : 'public') + ' page user fetch preserves session, missing-token and loading policies', async () => {
+    const source = profileSource(own ? 'ProfilePage.jsx' : 'PublicUserProfile.jsx');
+    const marker = own ? '  useEffect(() => {\n    const fetchUser =' : '  // Fetch user info, experiences, and comments';
+    const start = source.indexOf(marker); const end = source.indexOf(own ? '  }, [navigate]);' : '  }, [id, navigate, loadExperiences]);', start);
+    const effect = source.slice(start, end + (own ? '  }, [navigate]);'.length : '  }, [id, navigate, loadExperiences]);'.length));
+    for (const status of ['no-token', 200, 401, 403, 500, undefined]) {
+      const storage = new Map([['authToken', 'fixture'], ['user', 'stored']]); if (status === 'no-token') storage.delete('authToken');
+      const redirects = []; const loads = []; let user; let loading; let finishContent;
+      vm.runInNewContext(effect, { id: a, navigate: (...args) => redirects.push(args), useEffect: fn => fn(),
+        localStorage: { getItem: key => storage.get(key), removeItem: key => storage.delete(key) },
+        setLoading: value => { loading = value; }, setUserData: value => { user = value; }, setFormData() {}, setUserInfo: value => { user = value; },
+        loadExperiences: value => { loads.push(value); return new Promise(resolve => { finishContent = resolve; }); },
+        apiRequest: async url => { assert.equal(url, own ? '/api/auth/me' : `/api/users/${a}`); if (status !== 200) throw { status }; return profileFixture; },
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      if (status === 200 && !own) { assert.equal(loading, true); assert.equal(loads[0], profileFixture); finishContent(true); await new Promise(resolve => setImmediate(resolve)); }
+      assert.equal(loading, false);
+      assert.equal(storage.has('user'), ![401, 403].includes(status));
+      assert.equal(redirects.length, [401, 403].includes(status) || (!own && status === 'no-token') ? 1 : 0);
+      if ([401, 403].includes(status)) { assert.equal(redirects[0][0], '/login'); assert.equal(redirects[0][1].replace, true); }
+      if (!own && status === 'no-token') assert.deepEqual(redirects[0], ['/login']);
+      if (status === 200) assert.equal(user, profileFixture);
+      if (!own && [500, undefined].includes(status)) assert.equal(user, null);
+    }
+  });
+}
+
+test('own profile update and experience modal retain page-specific state, copy and failure behavior', async () => {
+  const source = profileSource('ProfilePage.jsx');
+  const start = source.indexOf('  const handleSubmit ='); const helper = source.slice(start, source.indexOf('\n  };', start) + 5);
+  for (const status of [200, 403, undefined]) {
+    const state = {}; const storage = new Map(); const formData = { name: 'Updated', email: 'unchanged-form-field' };
+    const ctx = vm.createContext({ formData, setMsg: v => { state.msg = v; }, setError: v => { state.error = v; }, setSubmitting: v => { state.submitting = v; },
+      setUserData: v => { state.user = v; }, setIsEditing: v => { state.editing = v; }, localStorage: { setItem: (k,v) => storage.set(k,v) },
+      apiRequest: async (url, options) => { assert.equal(url, '/api/auth/me'); assert.equal(options.method, 'PUT'); assert.equal(options.data, formData); if (status !== 200) throw { status }; return profileFixture; },
+    });
+    vm.runInContext(helper + '\nglobalThis.submit = handleSubmit;', ctx); await ctx.submit({ preventDefault() {} });
+    assert.equal(state.submitting, false);
+    if (status === 200) { assert.equal(state.msg, 'Profile updated!'); assert.equal(state.editing, false); assert.deepEqual(JSON.parse(storage.get('user')), profileFixture); }
+    else { assert.equal(state.error, status === undefined ? 'Failed to update profile. Please try again.' : 'Failed to update profile.'); assert.equal(storage.size, 0); }
+  }
+  for (const text of ['Go to Home', 'Your Posts', 'Choose an Avatar', 'Save Changes', 'Cancel', 'Edit Your Interview Experience',
+    'if (await data.updateExperience(editFormData._id, editFormData))', 'setEditFormData(exp)', 'newRounds[index].roundName = e.target.value']) assert.ok(source.includes(text));
+  const publicPage = profileSource('PublicUserProfile.jsx');
+  for (const text of ['User not found.', 'Loading...', 'Send Message', 'navigate(`/message?user=${userInfo._id}`)', 'navigate(-1)', 'localStorage.getItem("user")']) assert.ok(publicPage.includes(text));
+});
+
+
+test('own profile initializes navigate before effect dependencies (authorized baseline fix)', () => {
+  const source = profileSource('ProfilePage.jsx');
+  const start = source.indexOf('const ProfilePage = () => {');
+  const declaration = source.indexOf('const navigate = useNavigate();', start);
+  assert.ok(declaration > start);
+  assert.ok(declaration < source.indexOf('[navigate]', start));
+  assert.equal((source.match(/const navigate = useNavigate\(\);/g) || []).length, 1);
 });

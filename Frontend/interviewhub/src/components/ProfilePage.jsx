@@ -1,18 +1,10 @@
 import { Edit, Save, User, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; // <-- Add this import
-import ExperienceCard from "./ExperienceCard";
+import ProfileExperienceFeed from './profile/ProfileExperienceFeed';
+import useProfileExperiences from '../hooks/useProfileExperiences';
 
 import { apiRequest } from '../services/apiClient';
-
-const MAX_NESTING = 3;
-
-const experienceContent = data => ({
-  company: data.company, role: data.role, difficulty: data.difficulty,
-  roundDate: data.roundDate, description: data.description, tips: data.tips,
-  rounds: data.rounds?.map(({ roundName, questions, duration }) => ({ roundName, questions, duration })),
-});
-
 
 // Helper components
 const Input = ({ label, ...props }) => (
@@ -33,18 +25,14 @@ const ProfileDetail = ({ label, value }) => (
 );
 
 const ProfilePage = () => {
-  const fetchContent = async url => {
-    try {
-      return await apiRequest(url);
-    } catch (error) {
-      if (error.status === 401 || error.status === 403) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        navigate('/login', { replace: true });
-      }
-      throw error;
+  const navigate = useNavigate();
+  const handleContentAuthFailure = useCallback(status => {
+    if (status === 401 || status === 403) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      navigate('/login', { replace: true });
     }
-  };
+  }, [navigate]);
 
   const [userData, setUserData] = useState({
     name: "",
@@ -63,27 +51,7 @@ const ProfilePage = () => {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [userPosts, setUserPosts] = useState([]);
-  const [postsLoading, setPostsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  // --- ExperienceCard UI State ---
-  const [expandedDescriptions, setExpandedDescriptions] = useState({});
-  const [expandedRounds, setExpandedRounds] = useState({});
-
-  // --- Comments State ---
-  const [expandedComments, setExpandedComments] = useState({});
-  const [commentCounts, setCommentCounts] = useState({});
-  const [allComments, setAllComments] = useState({});
-  const [commentInputs, setCommentInputs] = useState({});
-  const [commentLoading, setCommentLoading] = useState(false);
-  // const [sortedComments, setSortedComments] = useState([]);
-  const [editingCommentId, setEditingCommentId] = useState(null);
-  const [editingCommentText, setEditingCommentText] = useState("");
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [replyInputs, setReplyInputs] = useState({});
-  const [collapsedComments, setCollapsedComments] = useState({});
-  const highlightedCommentId = null;
 
   const avatarOptions = [
   "https://api.dicebear.com/7.x/adventurer/svg?seed=Alex",
@@ -131,49 +99,7 @@ const ProfilePage = () => {
     fetchUser();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchPosts = async () => {
-      setPostsLoading(true);
-      try {
-        if (userData._id) {
-          let posts = await fetchContent(`/api/experiences/user/${userData._id}`);
-          if (!Array.isArray(posts)) throw new Error('Invalid experience response');
-          // Ensure each post has user info
-          posts = posts.map((post) => ({
-            ...post,
-            user: userData,
-          }));
-          setUserPosts(posts);
-        }
-      } catch {
-        setUserPosts([]);
-      }
-      setPostsLoading(false);
-    };
-    fetchPosts();
-  }, [userData._id]);
-
-  useEffect(() => {
-    if (userPosts.length === 0) return;
-    const fetchAllComments = async () => {
-      const all = {};
-      const counts = {};
-      for (const post of userPosts) {
-        try {
-          const comments = await fetchContent(`/api/comments/experience/${post._id}`);
-          if (!Array.isArray(comments)) throw new Error('Invalid comment response');
-          all[post._id] = comments;
-          counts[post._id] = comments.length;
-        } catch {
-          all[post._id] = [];
-          counts[post._id] = 0;
-        }
-      }
-      setAllComments(all);
-      setCommentCounts(counts);
-    };
-    fetchAllComments();
-  }, [userPosts]);
+  const data = useProfileExperiences({ profileUser: userData, mode: 'own', onAuthFailure: handleContentAuthFailure });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -199,193 +125,11 @@ const ProfilePage = () => {
     setSubmitting(false);
   };
 
-  // Expand/collapse description
-  const toggleDescription = (id) => {
-    setExpandedDescriptions((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  // Expand/collapse rounds
-  const toggleRounds = (id) => {
-    setExpandedRounds((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
   // Edit experience
   const handleEditExperience = (exp) => {
     setEditFormData(exp);
     setIsEditing(true);
   };
-
-  // Delete experience
-  const handleDeleteExperience = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this post?")) return;
-    try {
-      await apiRequest(`/api/experiences/${id}`, { method: "DELETE" });
-      setUserPosts((prev) => prev.filter((post) => post._id !== id));
-    } catch {
-      // Optionally set an error state
-    }
-  };
-
-  // Expand/collapse comments
-  const toggleComments = (id) => {
-    setExpandedComments((prev) => {
-      const isNowExpanded = !prev[id];
-      // If expanding and comments not loaded, fetch them
-      if (isNowExpanded && !allComments[id]) {
-        fetchComments(id);
-      }
-      return {
-        ...prev,
-        [id]: isNowExpanded,
-      };
-    });
-  };
-
-  // Fetch comments for a post
-  const fetchComments = async (postId) => {
-    setCommentLoading(true);
-    try {
-      const comments = await fetchContent(`/api/comments/experience/${postId}`);
-      if (!Array.isArray(comments)) throw new Error('Invalid comment response');
-      setAllComments((prev) => ({
-        ...prev,
-        [postId]: comments,
-      }));
-      setCommentCounts((prev) => ({
-        ...prev,
-        [postId]: comments.length,
-      }));
-    } catch {
-      // Optionally handle error
-    }
-    setCommentLoading(false);
-  };
-
-  // Post a new comment
-  const handlePostComment = async (postId, textArg, parentId) => {
-    // If called from reply input, textArg and parentId will be set.
-    // If called from top-level input, use commentInputs[postId].
-    const text = textArg !== undefined ? textArg.trim() : (commentInputs[postId]?.trim() || "");
-    if (!text) return;
-    setCommentLoading(true);
-    try {
-      const body = parentId
-        ? { text, experienceId: postId, parentCommentId: parentId }
-        : { text, experienceId: postId };
-      await apiRequest(`/api/comments`, { method: "POST", data: body });
-      if (parentId) {
-        setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
-        setReplyingTo(null);
-      } else {
-        setCommentInputs((prev) => ({ ...prev, [postId]: "" }));
-      }
-      await fetchComments(postId);
-    } catch { /* Keep existing state when the request fails. */ }
-    setCommentLoading(false);
-  };
-
-  const handleEditComment = (commentId, commentText) => {
-    setEditingCommentId(commentId);
-    setEditingCommentText(commentText);
-  };
-
-  // Edit a comment
-  const handleEditCommentSave = async (commentId, postId) => {
-    const text = editingCommentText.trim();
-    if (!text) return;
-    setCommentLoading(true);
-    try {
-      await apiRequest(`/api/comments/${commentId}`, { method: "PUT", data: { text } });
-      setEditingCommentId(null);
-      setEditingCommentText("");
-      fetchComments(postId);
-    } catch { /* Keep existing state when the request fails. */ }
-    setCommentLoading(false);
-  };
-
-  // Delete a comment
-  const handleDeleteComment = async (commentId, postId) => {
-    // if (!window.confirm("Delete this comment?")) return;
-    setCommentLoading(true);
-    try {
-      await apiRequest(`/api/comments/${commentId}`, { method: "DELETE" });
-      fetchComments(postId);
-    } catch { /* Keep existing state when the request fails. */ }
-    setCommentLoading(false);
-  };
-
-  // Post a reply to a comment
-  const handlePostReply = async (postId, parentId) => {
-    const text = replyInputs[parentId]?.trim();
-    if (!text) return;
-    setCommentLoading(true);
-    try {
-      await apiRequest(`/api/comments`, { method: "POST", data: { text, experienceId: postId, parentCommentId: parentId } });
-      setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
-      setReplyingTo(null);
-      await fetchComments(postId);
-    } catch { /* Keep existing state when the request fails. */ }
-    setCommentLoading(false);
-  };
-
-  // Build comment tree (for nested comments)
-  const buildCommentTree = (comments) => {
-    if (!Array.isArray(comments)) return [];
-    const map = {};
-    comments.forEach((c) => (map[c._id] = { ...c, replies: [] })); // <-- use replies
-    const tree = [];
-    comments.forEach((c) => {
-      if (c.parentCommentId) {
-        map[c.parentCommentId]?.replies.push(map[c._id]); // <-- use replies
-      } else {
-        tree.push(map[c._id]);
-      }
-    });
-    return tree;
-  };
-
-  const sortedComments = (commentsArr) => {
-    if (!Array.isArray(commentsArr)) return [];
-    return commentsArr.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  };
-
-  const handleUpvote = async (expId) => {
-    try {
-      const updated = await apiRequest(`/api/experiences/${expId}/upvote`, { method: "POST" });
-      setUserPosts(prev =>
-        prev.map(exp =>
-          exp._id === expId
-            ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
-            : exp
-        )
-      );
-    } catch (error) {
-      if (error.status === undefined) alert('Failed to upvote');
-    }
-  };
-
-  const handleDownvote = async (expId) => {
-    try {
-      const updated = await apiRequest(`/api/experiences/${expId}/downvote`, { method: "POST" });
-      setUserPosts(prev =>
-        prev.map(exp =>
-          exp._id === expId
-            ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
-            : exp
-        )
-      );
-    } catch (error) {
-      if (error.status === undefined) alert('Failed to downvote');
-    }
-  };
-
-  const navigate = useNavigate(); // <-- Add this hook
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
 
@@ -498,56 +242,7 @@ const ProfilePage = () => {
       {/* User Posts Section */}
       <div className="mx-4">
         <h2 className="text-xl font-bold mb-4 text-blue-700">Your Posts</h2>
-        {postsLoading ? (
-          <div className="text-gray-400">Loading posts...</div>
-        ) : userPosts.length === 0 ? (
-          <div className="text-gray-500">You haven't posted anything yet.</div>
-        ) : (
-          <div className="space-y-6">
-            {userPosts.map((post) => (
-              <ExperienceCard
-                key={post._id}
-                exp={post}
-                user={userData}
-                expandedDescriptions={expandedDescriptions}
-                toggleDescription={toggleDescription}
-                expandedRounds={expandedRounds}
-                toggleRounds={toggleRounds}
-                handleEditExperience={handleEditExperience}
-                handleDeleteExperience={handleDeleteExperience}
-                expandedComments={expandedComments}
-                toggleComments={toggleComments}
-                commentCounts={commentCounts}
-                allComments={allComments}
-                commentInputs={commentInputs}
-                setCommentInputs={setCommentInputs}
-                commentLoading={commentLoading}
-                handlePostComment={handlePostComment}
-                buildCommentTree={buildCommentTree}
-                sortedComments={sortedComments}
-                editingCommentId={editingCommentId}
-                editingCommentText={editingCommentText}
-                setEditingCommentId={setEditingCommentId}
-                setEditingCommentText={setEditingCommentText}
-                handleEditComment={handleEditComment}
-                handleEditCommentSave={(postId, commentId) => handleEditCommentSave(commentId, postId)}
-                handleDeleteComment={(postId, commentId) => handleDeleteComment(commentId, postId)}
-                replyingTo={replyingTo}
-                setReplyingTo={setReplyingTo}
-                replyInputs={replyInputs}
-                setReplyInputs={setReplyInputs}
-                collapsedComments={collapsedComments}
-                setCollapsedComments={setCollapsedComments}
-                highlightedCommentId={highlightedCommentId}
-                MAX_NESTING={MAX_NESTING}
-                handlePostReply={handlePostReply}
-                handleUpvote={handleUpvote} 
-                handleDownvote={handleDownvote} 
-                voteLoading={false}
-              />
-            ))}
-          </div>
-        )}
+        <ProfileExperienceFeed data={data} mode="own" viewer={userData} onEditExperience={handleEditExperience} />
       </div>
 
       {/* Edit Experience Modal */}
@@ -567,16 +262,9 @@ const ProfilePage = () => {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                try {
-                  const updated = await apiRequest(`/api/experiences/${editFormData._id}`, { method: "PUT", data: experienceContent(editFormData) });
-                  setUserPosts((prev) =>
-                    prev.map((p) => (p._id === updated._id ? { ...updated, user: userData } : p))
-                  );
+                if (await data.updateExperience(editFormData._id, editFormData)) {
                   setIsEditing(false);
                   setEditFormData(null);
-                } catch (error) {
-                  alert('Failed to update experience');
-                  console.error(error);
                 }
               }}
               className="space-y-4"
