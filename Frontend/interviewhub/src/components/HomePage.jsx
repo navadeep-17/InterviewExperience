@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiRequest } from '../services/apiClient';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
@@ -16,7 +16,6 @@ import ExperienceCard from './ExperienceCard';
 dayjs.extend(relativeTime);
 
 const MAX_NESTING = 3;
-const API_URL = import.meta.env.VITE_API_URL;
 
 const experienceContent = data => ({
   company: data.company, role: data.role, difficulty: data.difficulty,
@@ -103,12 +102,10 @@ const HomePage = () => {
       const token = localStorage.getItem('authToken');
       if (!token) return;
       try {
-        const res = await axios.get(`${API_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUser(res.data);
+        const res = await apiRequest(`/api/auth/me`);
+        setUser(res);
       } catch (error) {
-        handleContentAuthFailure(error.response?.status);
+        handleContentAuthFailure(error.status);
       }
     };
     fetchUser();
@@ -116,19 +113,15 @@ const HomePage = () => {
 
   // Fetch comment counts for all experiences
   const fetchCommentCounts = async (exps) => {
-    const token = localStorage.getItem('authToken');
     const counts = {};
     await Promise.all(
       exps.map(async (exp) => {
         try {
-          const res = await axios.get(
-            `${API_URL}/api/comments/experience/${exp._id}/count`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          if (!Number.isSafeInteger(res.data.count) || res.data.count < 0) throw new Error('Invalid count response');
-          counts[exp._id] = res.data.count;
+          const res = await apiRequest(`/api/comments/experience/${exp._id}/count`);
+          if (!Number.isSafeInteger(res.count) || res.count < 0) throw new Error('Invalid count response');
+          counts[exp._id] = res.count;
         } catch (err) {
-          handleContentAuthFailure(err.response?.status);
+          handleContentAuthFailure(err.status);
           counts[exp._id] = 0;
         }
       })
@@ -150,21 +143,19 @@ const HomePage = () => {
         sortOrder
       };
       Object.keys(params).forEach(key => !params[key] && delete params[key]);
-      const response = await axios.get(`${API_URL}/api/experiences`, {
-        params, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
-      });
-      const exps = response.data.experiences;
+      const response = await apiRequest(`/api/experiences`, { params: params });
+      const exps = response.experiences;
       if (!Array.isArray(exps)) throw new Error('Invalid experience response');
       if (pageNum === 1) {
         setExperiences(exps);
       } else {
         setExperiences(prev => [...prev, ...exps]);
       }
-      setTotalPages(response.data.totalPages);
+      setTotalPages(response.totalPages);
       setLoading(false);
       await fetchCommentCounts(exps);
     } catch (err) {
-      handleContentAuthFailure(err.response?.status);
+      handleContentAuthFailure(err.status);
       setError('Failed to load experiences.');
       setLoading(false);
     }
@@ -200,12 +191,7 @@ const HomePage = () => {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.post(
-        `${API_URL}/api/experiences`,
-        experienceContent(formData),
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiRequest(`/api/experiences`, { method: 'POST', data: experienceContent(formData) });
       setShowForm(false);
       setFormData({
         company: '',
@@ -223,7 +209,7 @@ const HomePage = () => {
       fetchExperiences(1);
     } catch (error) {
       alert('Failed to post experience');
-      console.error(error.response?.data || error.message);
+      console.error(error.data || error.message);
     }
   };
 
@@ -232,10 +218,7 @@ const HomePage = () => {
     if (!confirmDelete) return;
 
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.delete(`${API_URL}/api/experiences/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiRequest(`/api/experiences/${id}`, { method: 'DELETE' });
 
       setPage(1);
       setLoading(true);
@@ -254,16 +237,11 @@ const HomePage = () => {
   const handlePostComment = async (expId, text, parentCommentId = null) => {
     setCommentLoading(prev => ({ ...prev, [expId]: true }));
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await axios.post(
-        `${API_URL}/api/comments`,
-        {
+      const res = await apiRequest(`/api/comments`, { method: 'POST', data: {
           experienceId: expId,
           text: text || commentInputs[expId],
           parentCommentId: parentCommentId || null
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+        } });
       if (parentCommentId) {
         setReplyInputs(prev => ({ ...prev, [parentCommentId]: "" }));
         setReplyingTo(null);
@@ -272,7 +250,7 @@ const HomePage = () => {
       }
       await fetchAllComments(expId);
       await fetchCommentCounts([{ _id: expId }]);
-      setHighlightedCommentId(res.data._id);
+      setHighlightedCommentId(res._id);
       setTimeout(() => setHighlightedCommentId(null), 1500);
     } catch {
       alert('Failed to post comment');
@@ -281,16 +259,12 @@ const HomePage = () => {
   };
 
   const fetchAllComments = async (expId) => {
-    const token = localStorage.getItem('authToken');
     try {
-      const res = await axios.get(
-        `${API_URL}/api/comments/experience/${expId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!Array.isArray(res.data)) throw new Error('Invalid comment response');
-      setAllComments(prev => ({ ...prev, [expId]: res.data }));
+      const res = await apiRequest(`/api/comments/experience/${expId}`);
+      if (!Array.isArray(res)) throw new Error('Invalid comment response');
+      setAllComments(prev => ({ ...prev, [expId]: res }));
     } catch (err) {
-      handleContentAuthFailure(err.response?.status);
+      handleContentAuthFailure(err.status);
       setAllComments(prev => ({ ...prev, [expId]: [] }));
     }
   };
@@ -309,12 +283,7 @@ const HomePage = () => {
 
   const handleEditCommentSave = async (expId, commentId) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.put(
-        `${API_URL}/api/comments/${commentId}`,
-        { text: editingCommentText },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiRequest(`/api/comments/${commentId}`, { method: 'PUT', data: { text: editingCommentText } });
       setEditingCommentId(null);
       setEditingCommentText('');
       await fetchAllComments(expId);
@@ -326,11 +295,7 @@ const HomePage = () => {
 
   const handleDeleteComment = async (expId, commentId) => {
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.delete(
-        `${API_URL}/api/comments/${commentId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiRequest(`/api/comments/${commentId}`, { method: 'DELETE' });
       await fetchAllComments(expId);
       await fetchCommentCounts([{ _id: expId }]);
     } catch {
@@ -382,15 +347,10 @@ const HomePage = () => {
   const handleUpvote = async (expId) => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await axios.post(
-        `${API_URL}/api/experiences/${expId}/upvote`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiRequest(`/api/experiences/${expId}/upvote`, { method: 'POST', data: {} });
       setExperiences(prev =>
         prev.map(exp =>
-          exp._id === expId ? { ...exp, upvotes: res.data.upvotes, downvotes: res.data.downvotes } : exp
+          exp._id === expId ? { ...exp, upvotes: res.upvotes, downvotes: res.downvotes } : exp
         )
       );
     } catch {
@@ -402,15 +362,10 @@ const HomePage = () => {
   const handleDownvote = async (expId) => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
     try {
-      const token = localStorage.getItem('authToken');
-      const res = await axios.post(
-        `${API_URL}/api/experiences/${expId}/downvote`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiRequest(`/api/experiences/${expId}/downvote`, { method: 'POST', data: {} });
       setExperiences(prev =>
         prev.map(exp =>
-          exp._id === expId ? { ...exp, upvotes: res.data.upvotes, downvotes: res.data.downvotes } : exp
+          exp._id === expId ? { ...exp, upvotes: res.upvotes, downvotes: res.downvotes } : exp
         )
       );
     } catch {
@@ -755,14 +710,7 @@ const HomePage = () => {
               onSubmit={async (e) => {
                 e.preventDefault();
                 try {
-                  const token = localStorage.getItem('authToken');
-                  await axios.put(
-                    `${API_URL}/api/experiences/${editFormData._id}`,
-                    experienceContent(editFormData),
-                    {
-                      headers: { Authorization: `Bearer ${token}` },
-                    }
-                  );
+                  await apiRequest(`/api/experiences/${editFormData._id}`, { method: 'PUT', data: experienceContent(editFormData) });
                   setIsEditing(false);
                   setPage(1);
                   setLoading(true);

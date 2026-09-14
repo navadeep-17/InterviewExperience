@@ -373,25 +373,139 @@ test('experience/comment HTTP integrity matrix with isolated model and JWT mocks
 });
 
 const frontendPath = file => path.join(__dirname, '../../Frontend/interviewhub/src/components', file);
+const apiClientSource = () => fs.readFileSync(path.join(__dirname,
+  '../../Frontend/interviewhub/src/services/apiClient.js'), 'utf8');
+
+test('shared API client derives current auth and normalizes data/errors without session side effects', async () => {
+  const source = apiClientSource();
+  assert.ok(source.includes('import.meta.env.VITE_API_URL'));
+  let token = 'first-token';
+  const requests = [];
+  const payload = { content: 'fixture' };
+  let response = { data: payload };
+  let failure;
+  const ctx = vm.createContext({
+    localStorage: { getItem(key) { assert.equal(key, 'authToken'); return token; },
+      removeItem() { assert.fail('Transport must not clear auth'); } },
+    navigate() { assert.fail('Transport must not navigate'); },
+    axios: { create(options) {
+      assert.equal(options.baseURL, 'https://api.invalid');
+      return { async request(config) { requests.push(config); if (failure) throw failure; return response; } };
+    } },
+  });
+  vm.runInContext(source.replace(/^import axios[^\n]+\n/m, '')
+    .replace('import.meta.env.VITE_API_URL', JSON.stringify('https://api.invalid'))
+    .replace(/^export /gm, '') + '\nglobalThis.request = apiRequest; globalThis.ErrorType = ApiError;', ctx);
+  assert.equal(await ctx.request('/api/comments', { method: 'POST', data: payload }), payload);
+  assert.equal(requests[0].headers.Authorization, 'Bearer first-token');
+  assert.equal(requests[0].data, payload);
+  assert.equal(requests[0].method, 'POST');
+  token = 'replacement-token';
+  await ctx.request('/api/experiences', { params: { page: 2 } });
+  assert.equal(requests[1].headers.Authorization, 'Bearer replacement-token');
+  assert.equal(requests[1].params.page, 2);
+  assert.equal(requests[1].method, 'GET');
+  await ctx.request('/api/auth/login', { method: 'POST', auth: false, data: payload });
+  assert.equal(requests.at(-1).headers.Authorization, undefined);
+  for (token of [null, '', undefined]) {
+    await ctx.request('/api/auth/me');
+    assert.equal(requests.at(-1).headers.Authorization, undefined);
+  }
+  response = { data: '' };
+  assert.equal(await ctx.request('/empty'), '');
+  for (const status of [401, 403, 404, 500, undefined]) {
+    const data = { message: 'Bounded server message' };
+    failure = status === undefined ? new Error('private-network-detail') : { response: { status, data } };
+    await assert.rejects(ctx.request('/fixture'), error => {
+      assert.ok(error instanceof ctx.ErrorType);
+      assert.equal(error.status, status);
+      assert.equal(error.data, status === undefined ? undefined : data);
+      assert.equal(error.message, status === undefined
+        ? 'Unable to reach the server. Please try again.' : data.message);
+      return true;
+    });
+  }
+  failure = { response: { status: 502, data: '<html>upstream</html>' } };
+  await assert.rejects(ctx.request('/fixture'), error => error.message === 'Request failed. Please try again.');
+});
+
+test('frontend HTTP consumers centralize transport and public auth explicitly opts out', () => {
+  for (const file of ['A.jsx', 'HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx', 'Message.jsx']) {
+    const source = fs.readFileSync(frontendPath(file), 'utf8');
+    assert.match(source, /import \{[^}]*apiRequest[^}]*\} from ['"]\.\.\/services\/apiClient['"]/);
+    assert.equal(/\bfetch\s*\(|\baxios\b|Authorization|VITE_API_URL/.test(source), false);
+    if (file !== 'A.jsx') assert.equal(/auth:\s*false/.test(source), false);
+  }
+  const auth = fs.readFileSync(frontendPath('A.jsx'), 'utf8');
+  for (const endpoint of ['login', 'register', 'verify-otp', 'forgot-password', 'reset-password']) {
+    assert.match(auth, new RegExp("apiRequest\\('/api/auth/" + endpoint + "', \\{\\s*method: 'POST', auth: false"));
+  }
+  assert.ok(auth.includes("apiRequest('/api/auth/me')"));
+  const messages = fs.readFileSync(frontendPath('Message.jsx'), 'utf8');
+  assert.ok(messages.includes('io(API_BASE_URL, { autoConnect: false })'));
+  assert.ok(messages.includes('socket.auth = { token: authToken }'));
+  const card = fs.readFileSync(frontendPath('ExperienceCard.jsx'), 'utf8');
+  assert.ok(card.includes("import { API_BASE_URL } from '../services/apiClient'"));
+  assert.equal(card.includes('VITE_API_URL'), false);
+  assert.ok(card.includes('handleUpvote(exp._id)'));
+  assert.ok(card.includes('handleDownvote(exp._id)'));
+  const profile = fs.readFileSync(frontendPath('PublicUserProfile.jsx'), 'utf8');
+  assert.ok(profile.includes('apiRequest(`/api/users/${id}`)'));
+});
+
+test('login session validation preserves credentials on connectivity failures and ignores obsolete responses', async () => {
+  const source = fs.readFileSync(frontendPath('A.jsx'), 'utf8');
+  const start = source.indexOf('  useEffect(() => {');
+  const effect = source.slice(start, source.indexOf('  }, [navigate]);', start) + '  }, [navigate]);'.length);
+  for (const scenario of ['none', 'valid', 401, 403, 500, 'network', 'unmount', 'replacement']) {
+    const storage = new Map(scenario === 'none' ? [] : [['authToken', 'fixture'], ['user', 'old-user']]);
+    const redirects = [];
+    let cleanup; let resolve; let reject; let calls = 0;
+    vm.runInNewContext(effect, {
+      localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
+      navigate: (...args) => redirects.push(args),
+      useEffect: fn => { cleanup = fn(); },
+      apiRequest: url => { assert.equal(url, '/api/auth/me'); calls++; return new Promise((yes, no) => { resolve = yes; reject = no; }); },
+    });
+    if (scenario === 'none') { assert.equal(calls, 0); continue; }
+    if (scenario === 'unmount') cleanup();
+    if (scenario === 'replacement') storage.set('authToken', 'new-token');
+    if (['valid', 'unmount', 'replacement'].includes(scenario)) resolve({ _id: a });
+    else reject({ status: scenario === 'network' ? undefined : scenario });
+    await new Promise(done => setImmediate(done));
+    assert.equal(storage.has('authToken'), ![401, 403].includes(scenario));
+    assert.equal(storage.has('user'), ![401, 403].includes(scenario));
+    assert.equal(redirects.length, scenario === 'valid' ? 1 : 0);
+    if (scenario === 'valid') {
+      assert.equal(redirects[0][0], '/home'); assert.equal(redirects[0][1].replace, true);
+      assert.equal(JSON.parse(storage.get('user'))._id, a);
+    }
+    if (scenario === 'replacement') assert.equal(storage.get('authToken'), 'new-token');
+  }
+});
+
 for (const file of ['HomePage.jsx', 'ProfilePage.jsx', 'PublicUserProfile.jsx']) {
   test(file + ' authenticated content reads and nesting compatibility', async () => {
     const source = fs.readFileSync(frontendPath(file), 'utf8');
+    assert.ok(source.includes("import { apiRequest } from '../services/apiClient'"));
+    assert.equal(/\bfetch\s*\(|\baxios\s*\.|Authorization|auth:\s*false/.test(source), false);
     assert.ok(source.includes('const MAX_NESTING = 3;'));
     assert.ok(source.includes('MAX_NESTING={MAX_NESTING}'));
     assert.equal(source.includes('handleEditComment={() => {}}'), false);
     assert.ok(source.includes('(commentId, commentText) =>'));
     if (file === 'HomePage.jsx') {
-      const gets = [...source.matchAll(/axios.get\(([\s\S]*?)\);/g)].map(match => match[1]).filter(call => /api\/(experiences|comments)/.test(call));
-      assert.equal(gets.length, 3); gets.forEach(call => assert.ok(call.includes('Authorization:')));
-      assert.equal((source.match(/handleContentAuthFailure\(err.response\?\.status\)/g) || []).length, 3);
+      const gets = [...source.matchAll(/apiRequest\(([\s\S]*?)\);/g)].map(match => match[1])
+        .filter(call => /api\/(experiences|comments)/.test(call) && !call.includes('method:'));
+      assert.equal(gets.length, 3); gets.forEach(call => assert.equal(call.includes('auth: false'), false));
+      assert.equal((source.match(/handleContentAuthFailure\(err.status\)/g) || []).length, 3);
     } else {
       assert.equal(/await fetch\([^\n]+\/api\/(experiences\/user|comments\/experience)/.test(source), false);
       assert.equal((source.match(/await fetchContent\(/g) || []).length, 3);
       const helper = source.slice(source.indexOf('  const fetchContent ='), source.indexOf('\n  };', source.indexOf('  const fetchContent =')) + 5);
-      for (const status of [200, 401, 403, 500]) {
+      for (const status of [200, 401, 403, 500, undefined]) {
         const removed = []; const redirects = [];
         const ctx = vm.createContext({ localStorage: { getItem: () => 'fixture', removeItem: key => removed.push(key) }, navigate: (...args) => redirects.push(args),
-          fetch: async (url, options) => { assert.equal(options.headers.Authorization, 'Bearer fixture'); return { status, ok: status === 200 }; } });
+          apiRequest: async url => { assert.equal(url, '/fixture'); if (status !== 200) throw { status }; return ['parsed-content']; } });
         vm.runInContext(helper + '\nglobalThis.read = fetchContent;', ctx);
         if (status === 200) await ctx.read('/fixture'); else await assert.rejects(ctx.read('/fixture'));
         assert.equal(removed.length, [401, 403].includes(status) ? 2 : 0);

@@ -2,20 +2,21 @@ import { MessageCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom"; // <-- updated import
 import ExperienceCard from "./ExperienceCard";
+import { apiRequest } from '../services/apiClient';
+
 const MAX_NESTING = 3;
-const API_URL = import.meta.env.VITE_API_URL;
 const PublicUserProfile = () => {
   const fetchContent = async url => {
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-    });
-    if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      navigate('/login', { replace: true });
+    try {
+      return await apiRequest(url);
+    } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        navigate('/login', { replace: true });
+      }
+      throw error;
     }
-    if (!response.ok) throw new Error('Unable to fetch content');
-    return response;
   };
 
   const { id } = useParams();
@@ -82,22 +83,22 @@ const PublicUserProfile = () => {
       }
       try {
         // Fetch user info
-        const userRes = await fetch(`${API_URL}/api/users/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (userRes.status === 401 || userRes.status === 403) {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          navigate('/login', { replace: true });
-          setLoading(false);
-          return;
+        let userData;
+        try {
+          userData = await apiRequest(`/api/users/${id}`);
+        } catch (error) {
+          if (error.status === 401 || error.status === 403) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            navigate('/login', { replace: true });
+            setLoading(false);
+            return;
+          }
+          throw error;
         }
-        if (!userRes.ok) throw new Error('Unable to fetch student profile');
-        const userData = await userRes.json();
 
         // Fetch user's experiences
-        const expRes = await fetchContent(`${API_URL}/api/experiences/user/${id}`);
-        let expData = await expRes.json();
+        let expData = await fetchContent(`/api/experiences/user/${id}`);
         if (!Array.isArray(expData)) throw new Error('Invalid experience response');
         expData = expData.map(exp => ({ ...exp, user: userData }));
 
@@ -108,15 +109,14 @@ const PublicUserProfile = () => {
         const commentsObj = {};
         const countsObj = {};
         for (const exp of expData) {
-          const res = await fetchContent(`${API_URL}/api/comments/experience/${exp._id}`);
-          const comments = await res.json();
+          const comments = await fetchContent(`/api/comments/experience/${exp._id}`);
           if (!Array.isArray(comments)) throw new Error('Invalid comment response');
           commentsObj[exp._id] = comments;
           countsObj[exp._id] = comments.length;
         }
         setAllComments(commentsObj);
         setCommentCounts(countsObj);
-      } catch (err) {
+      } catch {
         setUserInfo(null);
         setExperiences([]);
       }
@@ -130,19 +130,16 @@ const PublicUserProfile = () => {
   const fetchComments = async (expId) => {
     setCommentLoading(true);
     try {
-      const res = await fetchContent(`${API_URL}/api/comments/experience/${expId}`);
-      if (res.ok) {
-        const comments = await res.json();
-        if (!Array.isArray(comments)) throw new Error('Invalid comment response');
-        setAllComments((prev) => ({
-          ...prev,
-          [expId]: comments,
-        }));
-        setCommentCounts((prev) => ({
-          ...prev,
-          [expId]: comments.length,
-        }));
-      }
+      const comments = await fetchContent(`/api/comments/experience/${expId}`);
+      if (!Array.isArray(comments)) throw new Error('Invalid comment response');
+      setAllComments((prev) => ({
+        ...prev,
+        [expId]: comments,
+      }));
+      setCommentCounts((prev) => ({
+        ...prev,
+        [expId]: comments.length,
+      }));
     } catch (err) {}
     setCommentLoading(false);
   };
@@ -151,28 +148,18 @@ const PublicUserProfile = () => {
     const text = textArg !== undefined ? textArg.trim() : (commentInputs[expId]?.trim() || "");
     if (!text) return;
     setCommentLoading(true);
-    const token = localStorage.getItem("authToken");
     try {
       const body = parentId
         ? { text, experienceId: expId, parentCommentId: parentId }
         : { text, experienceId: expId };
-      const res = await fetch(`${API_URL}/api/comments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        if (parentId) {
-          setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
-          setReplyingTo(null);
-        } else {
-          setCommentInputs((prev) => ({ ...prev, [expId]: "" }));
-        }
-        await fetchComments(expId);
+      await apiRequest(`/api/comments`, { method: "POST", data: body });
+      if (parentId) {
+        setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
+        setReplyingTo(null);
+      } else {
+        setCommentInputs((prev) => ({ ...prev, [expId]: "" }));
       }
+      await fetchComments(expId);
     } catch (err) {}
     setCommentLoading(false);
   };
@@ -181,37 +168,21 @@ const PublicUserProfile = () => {
     const text = editingCommentText.trim();
     if (!text) return;
     setCommentLoading(true);
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text }),
-      });
-      if (res.ok) {
-        setEditingCommentId(null);
-        setEditingCommentText("");
-        fetchComments(expId);
-      }
+      await apiRequest(`/api/comments/${commentId}`, { method: "PUT", data: { text } });
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      fetchComments(expId);
     } catch (err) {}
     setCommentLoading(false);
   };
 
   const handleDeleteComment = async (expId,commentId) => {
     // if (!window.confirm("Delete this comment?")) return;
-    const token = localStorage.getItem("authToken");
     setCommentLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        fetchComments(expId);
-      }
+      await apiRequest(`/api/comments/${commentId}`, { method: "DELETE" });
+      fetchComments(expId);
     } catch (err) {}
     setCommentLoading(false);
   };
@@ -220,65 +191,41 @@ const PublicUserProfile = () => {
     const text = replyInputs[parentId]?.trim();
     if (!text) return;
     setCommentLoading(true);
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`${API_URL}/api/comments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text, experienceId: expId, parentCommentId: parentId }),
-      });
-      if (res.ok) {
-        setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
-        setReplyingTo(null);
-        await fetchComments(expId);
-      }
+      await apiRequest(`/api/comments`, { method: "POST", data: { text, experienceId: expId, parentCommentId: parentId } });
+      setReplyInputs((prev) => ({ ...prev, [parentId]: "" }));
+      setReplyingTo(null);
+      await fetchComments(expId);
     } catch (err) {}
     setCommentLoading(false);
   };
 
   const handleUpvote = async (expId) => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
-    const token = localStorage.getItem('authToken');
     try {
-      const res = await fetch(`${API_URL}/api/experiences/${expId}/upvote`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setExperiences(prev =>
-          prev.map(exp =>
-            exp._id === expId
-              ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
-              : exp
-          )
-        );
-      }
+      const updated = await apiRequest(`/api/experiences/${expId}/upvote`, { method: "POST" });
+      setExperiences(prev =>
+        prev.map(exp =>
+          exp._id === expId
+            ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
+            : exp
+        )
+      );
     } catch (err) {}
     setVoteLoading(prev => ({ ...prev, [expId]: false }));
   };
 
   const handleDownvote = async (expId) => {
     setVoteLoading(prev => ({ ...prev, [expId]: true }));
-    const token = localStorage.getItem('authToken');
     try {
-      const res = await fetch(`${API_URL}/api/experiences/${expId}/downvote`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setExperiences(prev =>
-          prev.map(exp =>
-            exp._id === expId
-              ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
-              : exp
-          )
-        );
-      }
+      const updated = await apiRequest(`/api/experiences/${expId}/downvote`, { method: "POST" });
+      setExperiences(prev =>
+        prev.map(exp =>
+          exp._id === expId
+            ? { ...exp, upvotes: updated.upvotes, downvotes: updated.downvotes }
+            : exp
+        )
+      );
     } catch (err) {}
     setVoteLoading(prev => ({ ...prev, [expId]: false }));
   };
