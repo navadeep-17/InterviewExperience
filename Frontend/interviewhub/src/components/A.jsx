@@ -2,7 +2,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { apiRequest } from '../services/apiClient';
 function AuthForm() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -30,21 +30,17 @@ function AuthForm() {
     let cancelled = false;
     const validateSession = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
+        const user = await apiRequest('/api/auth/me');
+        if (!cancelled && localStorage.getItem('authToken') === authToken && user?._id) {
+          localStorage.setItem('user', JSON.stringify(user));
+          navigate('/home', { replace: true });
+        }
+      } catch (error) {
         if (cancelled || localStorage.getItem('authToken') !== authToken) return;
-        if (response.status === 401 || response.status === 403) {
+        if (error.status === 401 || error.status === 403) {
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
-        } else if (response.ok) {
-          const user = await response.json();
-          if (!cancelled && localStorage.getItem('authToken') === authToken && user?._id) {
-            localStorage.setItem('user', JSON.stringify(user));
-            navigate('/home', { replace: true });
-          }
         }
-      } catch {
         // Temporary connectivity failures leave the login form and credentials available.
       }
     };
@@ -75,59 +71,63 @@ function AuthForm() {
 
     if (isSignIn) {
       // Direct login (no OTP)
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password }),
-      });
-      const result = await response.json();
-      console.log(result);
-      if (response.ok && result.token && result.user) {
-        localStorage.setItem('authToken', result.token);
-        localStorage.setItem('user', JSON.stringify(result.user));
-        navigate('/home');
-      } else {
-        setMessage(result.message || 'Authentication failed!');
+      try {
+        const result = await apiRequest('/api/auth/login', {
+          method: 'POST', auth: false,
+          data: { email: formData.email, password: formData.password },
+        });
+        if (result?.token && result.user) {
+          localStorage.setItem('authToken', result.token);
+          localStorage.setItem('user', JSON.stringify(result.user));
+          navigate('/home');
+        } else {
+          setMessage(result?.message || 'Authentication failed!');
+        }
+      } catch (error) {
+        if (error.status === undefined) throw error;
+        setMessage(error.data?.message || 'Authentication failed!');
       }
     } else {
       // Registration with OTP
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.fullName,
-          email: formData.email,
-          password: formData.password,
-          graduationYear: formData.gradYear,
-          department: formData.major,
-          context: 'welcome'
-        })
-      });
-      const result = await response.json();
-      if (response.ok) {
+      try {
+        await apiRequest('/api/auth/register', {
+          method: 'POST', auth: false,
+          data: {
+            name: formData.fullName,
+            email: formData.email,
+            password: formData.password,
+            graduationYear: formData.gradYear,
+            department: formData.major,
+            context: 'welcome'
+          }
+        });
         setStep('otp');
         setMessage('OTP sent to your email. Please verify.');
-      } else {
-        setMessage(result.msg || result.message || 'Registration failed!');
+      } catch (error) {
+        if (error.status === undefined) throw error;
+        setMessage(error.data?.msg || error.data?.message || 'Registration failed!');
       }
     }
   };
 
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: formData.email, otp,context: 'reset' }),
-    });
-    const result = await response.json();
-    if (response.ok && result.token && result.user) {
-      localStorage.setItem('authToken', result.token);
-      localStorage.setItem('user', JSON.stringify(result.user));
-      alert('Login successful!');
-      navigate('/home');
-    } else {
-      setMessage(result.message || 'OTP verification failed!');
+    try {
+      const result = await apiRequest('/api/auth/verify-otp', {
+        method: 'POST', auth: false,
+        data: { email: formData.email, otp, context: 'reset' },
+      });
+      if (result?.token && result.user) {
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        alert('Login successful!');
+        navigate('/home');
+      } else {
+        setMessage(result?.message || 'OTP verification failed!');
+      }
+    } catch (error) {
+      if (error.status === undefined) throw error;
+      setMessage(error.data?.message || 'OTP verification failed!');
     }
   };
 
@@ -135,27 +135,24 @@ function AuthForm() {
     e.preventDefault();
     if (resetStep === 'email') {
       // Step 1: Send OTP
-      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail }),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      try {
+        await apiRequest('/api/auth/forgot-password', {
+          method: 'POST', auth: false,
+          data: { email: resetEmail },
+        });
         setResetStep('otp');
         setResetMsg('OTP sent to your email.');
-      } else {
-        setResetMsg(data.message || 'Failed to send OTP');
+      } catch (error) {
+        if (error.status === undefined) throw error;
+        setResetMsg(error.data?.message || 'Failed to send OTP');
       }
     } else {
       // Step 2: Verify OTP and set new password
-      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail, otp: resetOtp, newPassword: resetNewPassword }),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      try {
+        await apiRequest('/api/auth/reset-password', {
+          method: 'POST', auth: false,
+          data: { email: resetEmail, otp: resetOtp, newPassword: resetNewPassword },
+        });
         setResetMsg('Password reset successful! You can now log in.');
         setTimeout(() => {
           setShowReset(false);
@@ -165,8 +162,9 @@ function AuthForm() {
           setResetNewPassword('');
           setResetMsg('');
         }, 2000);
-      } else {
-        setResetMsg(data.message || 'Failed to reset password');
+      } catch (error) {
+        if (error.status === undefined) throw error;
+        setResetMsg(error.data?.message || 'Failed to reset password');
       }
     }
   };
