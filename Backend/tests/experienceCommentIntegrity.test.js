@@ -1058,14 +1058,28 @@ test('own profile update and experience modal retain page-specific state, copy a
   const source = profileSource('ProfilePage.jsx');
   const start = source.indexOf('  const handleSubmit ='); const helper = source.slice(start, source.indexOf('\n  };', start) + 5);
   for (const status of [200, 403, undefined]) {
-    const state = {}; const storage = new Map(); const formData = { name: 'Updated', email: 'unchanged-form-field' };
+    const state = {}; const storage = new Map();
+    const formData = {
+      name: 'Updated', graduationYear: '2028', rollNumber: 'TEST-2', currentlyStudying: 'Yes', phoneNumber: '', avatar: 'avatar-url',
+      email: 'protected@mgit.ac.in', department: 'CSE', _id: 'protected-id', unexpected: 'do-not-send',
+      password: 'do-not-send', isVerified: true, otp: 'do-not-send', otpExpiry: 'do-not-send',
+    };
+    let request;
     const ctx = vm.createContext({ formData, setMsg: v => { state.msg = v; }, setError: v => { state.error = v; }, setSubmitting: v => { state.submitting = v; },
       setUserData: v => { state.user = v; }, setIsEditing: v => { state.editing = v; }, localStorage: { setItem: (k,v) => storage.set(k,v) },
-      apiRequest: async (url, options) => { assert.equal(url, '/api/auth/me'); assert.equal(options.method, 'PUT'); assert.equal(options.data, formData); if (status !== 200) throw { status }; return profileFixture; },
+      apiRequest: async (url, options) => { request = { url, ...options }; if (status !== 200) throw { status }; return profileFixture; },
     });
     vm.runInContext(helper + '\nglobalThis.submit = handleSubmit;', ctx); await ctx.submit({ preventDefault() {} });
+    assert.equal(request.url, '/api/auth/me');
+    assert.equal(request.method, 'PUT');
+    assert.deepEqual(plain(request.data), {
+      name: 'Updated', graduationYear: '2028', rollNumber: 'TEST-2', currentlyStudying: 'Yes', phoneNumber: '', avatar: 'avatar-url',
+    });
+    for (const field of ['email', 'department', '_id', 'unexpected', 'password', 'isVerified', 'otp', 'otpExpiry']) assert.equal(field in request.data, false);
+    assert.equal(Object.hasOwn(request.data, 'phoneNumber'), true);
+    assert.equal(request.data.phoneNumber, '');
     assert.equal(state.submitting, false);
-    if (status === 200) { assert.equal(state.msg, 'Profile updated!'); assert.equal(state.editing, false); assert.deepEqual(JSON.parse(storage.get('user')), profileFixture); }
+    if (status === 200) { assert.equal(state.user, profileFixture); assert.equal(state.msg, 'Profile updated!'); assert.equal(state.editing, false); assert.deepEqual(JSON.parse(storage.get('user')), profileFixture); }
     else { assert.equal(state.error, status === undefined ? 'Failed to update profile. Please try again.' : 'Failed to update profile.'); assert.equal(storage.size, 0); }
   }
   for (const text of ['Go to Home', 'Your Posts', 'Choose an Avatar', 'Save Changes', 'Cancel', 'Edit Your Interview Experience',
@@ -1074,6 +1088,24 @@ test('own profile update and experience modal retain page-specific state, copy a
   for (const text of ['User not found.', 'Loading...', 'Send Message', 'navigate(`/message?user=${userInfo._id}`)', 'navigate(-1)', 'localStorage.getItem("user")']) assert.ok(publicPage.includes(text));
 });
 
+
+test('Profile editor keeps account-managed fields display-only and submits only editable fields', () => {
+  const source = profileSource('ProfilePage.jsx');
+  const formStart = source.indexOf('<form onSubmit={handleSubmit}');
+  assert.notEqual(formStart, -1);
+  const form = source.slice(formStart, source.indexOf('</form>', formStart));
+  assert.doesNotMatch(form, /<Input\s+label="(?:Department|Email)"/);
+  assert.match(form, /Account details/);
+  assert.match(form, /<ProfileDetail\s+label="Department"\s+value=\{userData\.department\}/);
+  assert.match(form, /<ProfileDetail\s+label="College Email"\s+value=\{userData\.email\}/);
+  assert.ok(form.includes('Email and department are tied to your verified college account and cannot be changed from your profile.'));
+  const payload = source.match(/const profileUpdate = \{([\s\S]*?)\};/);
+  assert.ok(payload, 'Profile updates use an explicit payload');
+  const fields = ['name', 'graduationYear', 'rollNumber', 'currentlyStudying', 'phoneNumber', 'avatar'];
+  assert.deepEqual([...payload[1].matchAll(/(\w+)\s*:/g)].map(match => match[1]), fields);
+  for (const field of fields) assert.ok(payload[1].includes(`${field}: formData.${field} ?? ""`));
+  assert.match(source, /apiRequest\('\/api\/auth\/me',\s*\{\s*method: 'PUT',\s*data: profileUpdate\s*\}\)/);
+});
 
 test('own profile initializes navigate before effect dependencies (authorized baseline fix)', () => {
   const source = profileSource('ProfilePage.jsx');

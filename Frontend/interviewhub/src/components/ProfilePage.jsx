@@ -113,7 +113,15 @@ const ProfilePage = () => {
     setError("");
     setSubmitting(true);
     try {
-      const updatedUser = await apiRequest('/api/auth/me', { method: 'PUT', data: formData });
+      const profileUpdate = {
+        name: formData.name ?? "",
+        graduationYear: formData.graduationYear ?? "",
+        rollNumber: formData.rollNumber ?? "",
+        currentlyStudying: formData.currentlyStudying ?? "",
+        phoneNumber: formData.phoneNumber ?? "",
+        avatar: formData.avatar ?? "",
+      };
+      const updatedUser = await apiRequest('/api/auth/me', { method: 'PUT', data: profileUpdate });
       setUserData(updatedUser);
       setIsEditing(false);
       localStorage.setItem("user", JSON.stringify(updatedUser));
@@ -179,10 +187,18 @@ const ProfilePage = () => {
 
         {isEditing ? (
           <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6">
+            <section aria-labelledby="account-details-heading" className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <h2 id="account-details-heading" className="text-sm font-semibold text-slate-900">Account details</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ProfileDetail label="Department" value={userData.department} />
+                <ProfileDetail label="College Email" value={userData.email} />
+              </div>
+              <p className="text-sm leading-relaxed text-slate-600">
+                Email and department are tied to your verified college account and cannot be changed from your profile.
+              </p>
+            </section>
             <Input label="Name" name="name" value={formData.name || ""} onChange={handleInputChange} />
-            <Input label="Department" name="department" value={formData.department || ""} onChange={handleInputChange} />
             <Input label="Graduation Year" name="graduationYear" value={formData.graduationYear || ""} onChange={handleInputChange} />
-            <Input label="Email" name="email" value={formData.email || ""} onChange={handleInputChange} />
             <Input label="Roll Number" name="rollNumber" value={formData.rollNumber || ""} onChange={handleInputChange} />
             <Input label="Currently Studying" name="currentlyStudying" value={formData.currentlyStudying || ""} onChange={handleInputChange} />
             <Input label="Phone Number" name="phoneNumber" value={formData.phoneNumber || ""} onChange={handleInputChange} />
