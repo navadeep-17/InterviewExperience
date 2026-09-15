@@ -63,20 +63,17 @@ const ExperienceCard = ({
           />
         </div>
         <div className="min-w-0">
-          <p
-            className={`font-semibold text-slate-900 cursor-pointer transition-colors duration-200
-              ${user && exp.user?._id !== user._id ? "hover:underline hover:text-indigo-600" : ""}
-            `}
-            onClick={() => {
-              if (user && exp.user?._id !== user._id) {
-                navigate(`/user/${exp.user?._id}`);
-              }
-            }}
-            title={user && exp.user?._id !== user._id ? "View Profile" : ""}
-            style={{ userSelect: "text" }}
-          >
-            {exp.user?.name || 'Unknown'}
-          </p>
+          {user && exp.user?._id !== user._id ? (
+            <button type="button"
+              className="font-semibold text-slate-900 text-left cursor-pointer transition-colors duration-200 hover:underline hover:text-indigo-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100"
+              onClick={() => navigate(`/user/${exp.user?._id}`)}
+              title="View Profile" style={{ userSelect: "text" }}
+            >
+              {exp.user?.name || 'Unknown'}
+            </button>
+          ) : (
+            <p className="font-semibold text-slate-900" style={{ userSelect: "text" }}>{exp.user?.name || 'Unknown'}</p>
+          )}
           <p className="text-xs text-slate-500">
             Posted on {new Date(exp.date || exp.createdAt).toLocaleString('en-US', {
               weekday: 'short',

@@ -67,11 +67,15 @@ const HomePage = () => {
   // --- UI ---
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {sidebarOpen && (
+        <button type="button" aria-label="Close navigation" className="fixed inset-0 bg-slate-900/30 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)} />
+      )}
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 text-slate-600 ${sidebarOpen ? 'translate-x-0 md:w-64' : '-translate-x-full invisible md:visible md:translate-x-0 md:w-20'} transition-all duration-300 flex flex-col md:sticky md:top-0 md:h-screen md:shrink-0`}>
+      <aside id="dashboard-navigation" className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 text-slate-600 ${sidebarOpen ? 'translate-x-0 md:w-64' : '-translate-x-full invisible md:visible md:translate-x-0 md:w-20'} transition-all duration-300 flex flex-col md:sticky md:top-0 md:h-screen md:shrink-0`}>
         <div className="p-4 flex items-center justify-between">
           {sidebarOpen && <h2 className="text-xl font-bold text-indigo-700">RoundRelay</h2>}
-          <button onClick={toggleSidebar} aria-label="Toggle navigation" className="p-2.5 rounded-xl hover:bg-indigo-50 text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
+          <button onClick={toggleSidebar} aria-label="Toggle navigation" aria-controls="dashboard-navigation" aria-expanded={sidebarOpen} className="p-2.5 rounded-xl hover:bg-indigo-50 text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -114,7 +118,7 @@ const HomePage = () => {
       <div className="flex-1 min-w-0">
         <header className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 sm:px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <button onClick={toggleSidebar} aria-label="Open navigation" className="md:hidden p-2.5 rounded-xl text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
+            <button onClick={toggleSidebar} aria-label="Open navigation" aria-controls="dashboard-navigation" aria-expanded={sidebarOpen} className="md:hidden p-2.5 rounded-xl text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
               <Menu className="w-5 h-5" />
             </button>
             <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>

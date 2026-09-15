@@ -762,3 +762,54 @@ test('messaging URL preselection keeps query/directory triggers and selected-use
     if (selectedUsers.length) assert.equal(selectedUsers[0], userB);
   }
 });
+
+
+test('Phase 6 messaging controls support keyboard selection, closing, empty states and confirmed deletion', () => {
+  const page = messagingSource('components/Message.jsx');
+  const sidebar = messagingSource('components/messages/ChatSidebar.jsx');
+  const list = messagingSource('components/messages/MessageList.jsx');
+  assert.ok(page.includes('aria-controls="chat-navigation" aria-expanded={sidebarOpen}'));
+  assert.ok(sidebar.includes('<aside id="chat-navigation"'));
+  assert.match(sidebar, /<button type="button" onClick=\{onClose\} aria-label="Close chat navigation"\s+className="md:hidden/);
+  assert.ok(page.includes('onClose={() => setSidebarOpen(false)}'));
+  for (const kind of ['User', 'Group']) {
+    const value = kind.toLowerCase();
+    const wrapper = page.match(new RegExp('const handleSelect' + kind + ' = ' + value + ' => \\{([^]*?)\\n  \\};'));
+    assert.ok(wrapper);
+    const calls = [];
+    vm.runInNewContext('(' + value + ' => {' + wrapper[1] + '})(selection)', {
+      selection: { _id: b }, ['select' + kind]: item => calls.push(['select', item._id]), setSidebarOpen: open => calls.push(['open', open]),
+    });
+    assert.deepEqual(calls, [['select', b], ['open', false]]);
+    assert.ok(page.includes('onSelect' + kind + '={handleSelect' + kind + '}'));
+    const button = (sidebar.match(/<button\b[^]*?<\/button>/g) || []).find(control => control.includes('onSelect' + kind + '(' + value + ')'));
+    assert.ok(button && button.includes('type="button"'), kind + ' selection is a button');
+  }
+  assert.ok(sidebar.includes('aria-label={`View ${user.name}\'s profile`}'));
+  for (const text of ['filteredUsers.length === 0', 'No users found.', 'groups.length === 0', 'No groups available.']) assert.ok(sidebar.includes(text));
+  assert.equal(page.split('<button type="button" onClick={() => navigate(`/user/${selectedUser._id}`)}').length - 1, 2);
+  assert.equal((page.match(/\{selectedUser \? \(\s*<button/g) || []).length, 2);
+  for (const heading of page.match(/<h3\b[^>]*>/g) || []) assert.equal(heading.includes('onClick='), false);
+  assert.ok(page.includes('visible={Boolean(selectedUser || selectedGroup)}'));
+  assert.match(page, /\{sidebarOpen && \(\s*<div\s+className="[^"\n]*md:hidden"\s+onClick=\{\(\) => setSidebarOpen\(false\)\}/);
+  for (const text of ['Choose a conversation to start messaging.', 'No messages yet. Start the conversation.', 'No messages in this group yet.',
+    '!selectedUser && !selectedGroup && (', 'selectedUser && currentMessages.length === 0 && !initialLoading', 'selectedGroup && groupMessages.length === 0 && !initialLoading']) assert.ok(list.includes(text));
+  const initialLoading = list.match(/const initialLoading = ([^;]+);/);
+  assert.ok(initialLoading);
+  for (const [loadingMore, page, selectedGroup, expected] of [[true, 1, null, true], [true, 3, {}, true], [false, 1, null, false], [true, 2, null, false]]) {
+    assert.equal(vm.runInNewContext(initialLoading[1], { loadingMore, page, selectedGroup }), expected);
+  }
+  for (const handler of ['handleDeleteMessage', 'handleDeleteGroupMessage']) {
+    const blocks = [...list.matchAll(/onClick=\{\(\) => \{\s*(if \(!window\.confirm\([^}]+?)\s*\}\}/g)];
+    const deletion = blocks.find(block => block[1].includes(handler + '(msg._id)'));
+    assert.ok(deletion, handler + ' is confirmation-gated');
+    assert.ok(deletion[1].includes('Delete this message? It will be removed for everyone.'));
+    for (const confirmed of [false, true]) {
+      const calls = [];
+      vm.runInNewContext('(() => {' + deletion[1] + '})()', {
+        window: { confirm: () => confirmed }, msg: { _id: b }, [handler]: id => calls.push(id), setDropdownOpen: () => {},
+      });
+      assert.deepEqual(calls, confirmed ? [b] : []);
+    }
+  }
+});

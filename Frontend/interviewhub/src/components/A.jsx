@@ -3,6 +3,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { apiRequest } from '../services/apiClient';
+function StatusMessage({ message }) {
+  if (!message) return null;
+  const positive = [
+    'OTP sent to your email. Please verify.',
+    'OTP sent to your email.',
+    'Password reset successful! You can now log in.',
+  ].includes(message);
+  return (
+    <div role={positive ? 'status' : 'alert'} className={`text-center text-base font-medium mt-2 ${positive ? 'text-emerald-600' : 'text-red-600'}`}>
+      {message}
+    </div>
+  );
+}
+
 function AuthForm() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -227,9 +241,7 @@ function AuthForm() {
               >
                 Verify OTP
               </button>
-              {message && (
-                <div className="text-center text-base font-medium text-red-600 mt-2">{message}</div>
-              )}
+              <StatusMessage message={message} />
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -273,18 +285,10 @@ function AuthForm() {
                 onRightIconClick={togglePasswordVisibility}
               />
 
-              {message && (
-                <div className={`text-center text-base font-medium mt-2 ${message.toLowerCase().includes('success') ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {message}
-                </div>
-              )}
+              <StatusMessage message={message} />
 
               {isSignIn && (
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm mt-2">
-                  <label className="flex items-center gap-2 text-slate-700">
-                    <input type="checkbox" className="h-4 w-4 rounded border-slate-200 accent-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500" />
-                    Remember me
-                  </label>
+                <div className="flex justify-end text-sm mt-2">
                   <button type="button" className="text-indigo-700 hover:underline font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5" onClick={() => setShowReset(true)}>
                     Forgot password?
                   </button>
@@ -340,9 +344,7 @@ function AuthForm() {
                   {resetStep === 'email' ? 'Send OTP' : 'Reset Password'}
                 </button>
 
-                {resetMsg && (
-                  <div className="text-center text-base font-medium text-red-600 mt-2">{resetMsg}</div>
-                )}
+                <StatusMessage message={resetMsg} />
               </form>
             </div>
           )}

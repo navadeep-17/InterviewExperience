@@ -24,6 +24,14 @@ const MessageComponent = () => {
 
   const data = useMessaging({ currentUser, authToken, onSocketAuthFailure: handleSocketAuthFailure });
   const { users, groups, selectedUser, selectedGroup, selectUser, selectGroup } = data;
+  const handleSelectUser = user => {
+    selectUser(user);
+    setSidebarOpen(false);
+  };
+  const handleSelectGroup = group => {
+    selectGroup(group);
+    setSidebarOpen(false);
+  };
   // Preserve query/directory-triggered preselection without reselecting after a group click.
   const selectedUserRef = useRef(selectedUser);
   selectedUserRef.current = selectedUser;
@@ -54,7 +62,7 @@ const MessageComponent = () => {
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
-          aria-label="Open sidebar"
+          aria-label="Open sidebar" aria-controls="chat-navigation" aria-expanded={sidebarOpen}
         >
           <MessageSquare className="w-7 h-7" />
         </button>
@@ -65,7 +73,8 @@ const MessageComponent = () => {
       <ChatSidebar open={sidebarOpen} users={users} groups={groups}
         selectedUser={selectedUser} selectedGroup={selectedGroup}
         onBack={() => navigate('/home')} onViewProfile={id => navigate(`/user/${id}`)}
-        onSelectUser={selectUser} onSelectGroup={selectGroup} />
+        onClose={() => setSidebarOpen(false)}
+        onSelectUser={handleSelectUser} onSelectGroup={handleSelectGroup} />
 
       {/* Backdrop for mobile sidebar */}
       {sidebarOpen && (
@@ -83,19 +92,13 @@ const MessageComponent = () => {
             {selectedUser && (
               <ChatAvatar user={selectedUser} size={44} />
             )}
-            <h3
-              className={`text-xl font-bold text-indigo-700 cursor-pointer hover:underline`}
-              onClick={() => {
-                if (selectedUser) navigate(`/user/${selectedUser._id}`);
-              }}
-              title={selectedUser ? "View Public Profile" : ""}
-              style={{ userSelect: "text" }}
-            >
-              {selectedUser
-                ? selectedUser.name
-                : selectedGroup
-                ? `Group: ${selectedGroup.name}`
-                : 'Select a user or group to chat'}
+            <h3 className="text-xl font-bold text-indigo-700" style={{ userSelect: "text" }}>
+              {selectedUser ? (
+                <button type="button" onClick={() => navigate(`/user/${selectedUser._id}`)}
+                  className="text-left hover:underline rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100" title="View Public Profile">
+                  {selectedUser.name}
+                </button>
+              ) : selectedGroup ? `Group: ${selectedGroup.name}` : 'Select a user or group to chat'}
             </h3>
           </div>
         </div>
@@ -104,19 +107,13 @@ const MessageComponent = () => {
           {selectedUser && (
             <ChatAvatar user={selectedUser} size={36} />
           )}
-          <h3
-            className="text-base font-bold text-indigo-700 truncate cursor-pointer hover:underline"
-            onClick={() => {
-              if (selectedUser) navigate(`/user/${selectedUser._id}`);
-            }}
-            title={selectedUser ? "View Public Profile" : ""}
-            style={{ userSelect: "text" }}
-          >
-            {selectedUser
-              ? selectedUser.name
-              : selectedGroup
-              ? `Group: ${selectedGroup.name}`
-              : 'Select a chat'}
+          <h3 className="text-base truncate font-bold text-indigo-700" style={{ userSelect: "text" }}>
+            {selectedUser ? (
+              <button type="button" onClick={() => navigate(`/user/${selectedUser._id}`)}
+                className="text-left hover:underline rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 max-w-full truncate" title="View Public Profile">
+                {selectedUser.name}
+              </button>
+            ) : selectedGroup ? `Group: ${selectedGroup.name}` : 'Select a chat'}
           </h3>
         </div>
 

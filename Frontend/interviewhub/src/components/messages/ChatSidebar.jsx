@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { MessageSquare, User2 } from 'lucide-react';
+import { MessageSquare, User2, X } from 'lucide-react';
 import ChatAvatar from './ChatAvatar';
 
-export default function ChatSidebar({ open, users, groups, selectedUser, selectedGroup, onBack, onViewProfile, onSelectUser, onSelectGroup }) {
+export default function ChatSidebar({ open, users, groups, selectedUser, selectedGroup, onBack, onViewProfile, onSelectUser, onSelectGroup, onClose }) {
   const [search, setSearch] = useState('');
+  const filteredUsers = (Array.isArray(users) ? users : [])
+    .filter(user => user.name.toLowerCase().includes(search.toLowerCase()));
   return (
-    <aside
+    <aside id="chat-navigation"
       className={`
         fixed inset-y-0 left-0 z-30 bg-white border-r border-slate-200 flex flex-col w-72 max-w-[85vw] shrink-0
         transform transition-transform duration-300
@@ -27,6 +29,10 @@ export default function ChatSidebar({ open, users, groups, selectedUser, selecte
       <div className="px-5 py-4 text-xl font-bold flex items-center gap-3 border-b border-slate-200 bg-white text-indigo-700">
         <MessageSquare className="w-7 h-7" />
         Chats
+        <button type="button" onClick={onClose} aria-label="Close chat navigation"
+          className="md:hidden ml-auto p-2.5 rounded-xl hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+          <X className="w-5 h-5" />
+        </button>
       </div>
       <div className="p-4 bg-slate-50 border-b border-slate-200">
         <input aria-label="Search users..."
@@ -39,52 +45,53 @@ export default function ChatSidebar({ open, users, groups, selectedUser, selecte
       </div>
       <div className="flex-1 overflow-y-auto">
         <ul className="divide-y divide-slate-100">
-          {(Array.isArray(users) ? users : [])
-            .filter(user => user.name.toLowerCase().includes(search.toLowerCase()))
-            .map(user => (
-              <li
-                key={user._id}
-                className={`p-4 flex items-center gap-3 cursor-pointer transition rounded-xl mx-2 my-1
-                  ${selectedUser?._id === user._id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-indigo-50'}
-                `}
+          {filteredUsers.length === 0 && <li className="px-4 py-6 text-sm text-center text-slate-500">No users found.</li>}
+          {filteredUsers.map(user => (
+            <li
+              key={user._id}
+              className={`pr-4 flex items-center gap-3 transition rounded-xl mx-2 my-1
+                ${selectedUser?._id === user._id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-indigo-50'}
+              `}
+            >
+              <button type="button"
+                className="flex items-center gap-3 flex-1 min-w-0 p-4 text-left rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                onClick={() => {
+                  onSelectUser(user);
+                }}
               >
-                <div
-                  className="flex items-center gap-3 flex-1 min-w-0"
-                  onClick={() => {
-                    onSelectUser(user);
-                  }}
-                >
-                  <ChatAvatar user={user} size={44} />
-                  <span className="truncate">{user.name}</span>
-                </div>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    onViewProfile(user._id);
-                  }}
-                  className="ml-auto p-2 rounded-full hover:bg-indigo-100 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
-                  title="View Profile"
-                >
-                  <User2 className="w-5 h-5 text-indigo-600" />
-                </button>
-              </li>
-            ))}
+                <ChatAvatar user={user} size={44} />
+                <span className="truncate">{user.name}</span>
+              </button>
+              <button type="button" aria-label={`View ${user.name}'s profile`}
+                onClick={e => {
+                  e.stopPropagation();
+                  onViewProfile(user._id);
+                }}
+                className="ml-auto p-2 rounded-full hover:bg-indigo-100 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
+                title="View Profile"
+              >
+                <User2 className="w-5 h-5 text-indigo-600" />
+              </button>
+            </li>
+          ))}
         </ul>
         {/* Groups Section */}
         <div className="mt-6 mb-2 text-xs uppercase tracking-wider font-semibold text-slate-500 px-6">Groups</div>
         <ul className="divide-y divide-slate-100">
+          {groups.length === 0 && <li className="px-4 py-6 text-sm text-center text-slate-500">No groups available.</li>}
           {groups.map(group => (
-            <li
-              key={group._id}
-              onClick={() => {
-                onSelectGroup(group);
-              }}
-              className={`p-4 flex items-center gap-3 cursor-pointer transition rounded-xl mx-2 my-1
-                ${selectedGroup?._id === group._id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-indigo-50'}
-              `}
-            >
-              <ChatAvatar user={group} size={44} />
-              <span className="flex-1 truncate">{group.name}</span>
+            <li key={group._id} className="mx-2 my-1">
+              <button type="button"
+                onClick={() => {
+                  onSelectGroup(group);
+                }}
+                className={`p-4 w-full text-left flex items-center gap-3 cursor-pointer transition rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100
+                  ${selectedGroup?._id === group._id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-indigo-50'}
+                `}
+              >
+                <ChatAvatar user={group} size={44} />
+                <span className="flex-1 truncate">{group.name}</span>
+              </button>
             </li>
           ))}
         </ul>

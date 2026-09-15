@@ -1145,3 +1145,46 @@ test('RoundRelay branding is consistent across public copy and package metadata'
     for (const name of source.match(/roundrelay/gi) || []) assert.equal(name, 'RoundRelay');
   }
 });
+
+
+test('Phase 6 auth and content controls expose truthful status and accessible actions', () => {
+  const auth = profileSource('A.jsx');
+  assert.equal(auth.includes('Remember me'), false);
+  assert.equal(auth.includes('type="checkbox"'), false);
+  assert.ok(auth.includes('Forgot password?'));
+  const statusSource = auth.slice(auth.indexOf('function StatusMessage'), auth.indexOf('function AuthForm'));
+  assert.ok(statusSource.includes("role={positive ? 'status' : 'alert'}"));
+  assert.ok(statusSource.includes("positive ? 'text-emerald-600' : 'text-red-600'"));
+  const classify = vm.runInNewContext(statusSource.split('  return (')[0] + '  return positive; }\nStatusMessage;');
+  for (const message of ['OTP sent to your email. Please verify.', 'OTP sent to your email.', 'Password reset successful! You can now log in.']) assert.equal(classify({ message }), true);
+  for (const message of ['Authentication failed!', 'OTP verification failed!', 'Registration failed!', 'Failed to send OTP', 'Failed to reset password']) assert.equal(classify({ message }), false);
+  assert.equal((auth.match(/<StatusMessage message=/g) || []).length, 3);
+  const home = profileSource('HomePage.jsx');
+  assert.ok(home.includes('id="dashboard-navigation"'));
+  assert.equal((home.match(/aria-controls="dashboard-navigation" aria-expanded=\{sidebarOpen\}/g) || []).length, 2);
+  const backdrop = home.match(/<button[^]*?aria-label="Close navigation"[^]*?\/>/);
+  assert.ok(backdrop);
+  assert.ok(backdrop[0].includes('md:hidden'));
+  assert.ok(backdrop[0].includes('onClick={() => setSidebarOpen(false)}'));
+  assert.match(home, /\{sidebarOpen && \(\s*<button/);
+  const card = profileSource('ExperienceCard.jsx');
+  assert.match(card, /user && exp\.user\?\._id !== user\._id \? \(\s*<button type="button"/);
+  assert.ok(card.includes('onClick={() => navigate(`/user/${exp.user?._id}`)}'));
+  for (const paragraph of card.match(/<p\b[^>]*>/g) || []) assert.equal(paragraph.includes('onClick='), false);
+  const comment = profileSource('CommentThread.jsx');
+  const deletion = comment.match(/onClick=\{\(\) => \{\s*(if \(!window\.confirm\('Delete this comment\? Any replies under it will also be removed\.'\)\) return;\s*handleDeleteComment\(expId, comment\._id\);)\s*\}\}/);
+  assert.ok(deletion, 'Comment deletion is confirmation-gated');
+  for (const confirmed of [false, true]) {
+    const calls = [];
+    vm.runInNewContext('(() => {' + deletion[1] + '})()', {
+      window: { confirm: () => confirmed }, expId: x, comment: { _id: root }, handleDeleteComment: (...args) => calls.push(args),
+    });
+    assert.deepEqual(calls, confirmed ? [[x, root]] : []);
+  }
+  const modal = profileSource('home/ExperienceFormModal.jsx');
+  assert.ok(modal.includes('role="dialog" aria-modal="true" aria-labelledby={`experience-${mode}-title`}'));
+  assert.ok(modal.includes('<h2 id={`experience-${mode}-title`}'));
+  const profile = profileSource('ProfilePage.jsx');
+  assert.ok(profile.includes('role="dialog" aria-modal="true" aria-labelledby="profile-experience-title"'));
+  assert.match(profile, /<h2 id="profile-experience-title"[^>]*>Edit Your Interview Experience<\/h2>/);
+});
