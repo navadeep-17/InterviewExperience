@@ -1,6 +1,8 @@
-# InterviewHub
+# RoundRelay
 
-InterviewHub lets authenticated college students share interview experiences, comments, votes, student profiles, direct messages, and department group messages.
+> Real interview experiences, passed forward.
+
+RoundRelay is a peer-driven platform for college students to share real interview experiences, discuss rounds and questions, interact through comments and votes, explore student profiles, and connect through direct and department-group messaging.
 
 ## Stack and structure
 

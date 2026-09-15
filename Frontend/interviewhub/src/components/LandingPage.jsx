@@ -12,7 +12,7 @@ export default function LandingPage() {
           className="text-4xl md:text-5xl font-extrabold text-indigo-600 tracking-tight relative cursor-pointer transition-all duration-300
             after:content-[''] after:block after:h-0.5 after:bg-pink-400 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left"
         >
-          CareerStories
+          RoundRelay
         </span>
         <button
           className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center border border-indigo-100 hover:bg-indigo-50 transition-transform duration-200 hover:scale-110"
@@ -26,14 +26,14 @@ export default function LandingPage() {
       {/* Hero/About */}
       <section className="max-w-3xl mx-auto text-center mt-16 mb-20 animate-fade-in">
         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-6 transition-all duration-700 hover:text-indigo-600">
-          Share & Discover Real Interview Experiences
+          Real interview experiences, passed forward.
         </h1>
         <p className="text-lg text-slate-600 mb-8">
-          CareerStories is a platform where students share their interview journeys, learn from peers, and get inspired to achieve their dream jobs.
+          RoundRelay is a peer-driven platform where students share real interview journeys, learn from peers and seniors, and pass useful knowledge forward to prepare for interviews and placements.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <span className="px-4 py-2 bg-indigo-100 text-indigo-600 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Community Driven</span>
-          <span className="px-4 py-2 bg-pink-100 text-pink-500 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-pink-200">Verified Stories</span>
+          <span className="px-4 py-2 bg-pink-100 text-pink-500 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-pink-200">Peer Shared</span>
           <span className="px-4 py-2 bg-indigo-50 text-indigo-400 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">For Students, By Students</span>
         </div>
       </section>
@@ -82,7 +82,7 @@ export default function LandingPage() {
       <section className="max-w-4xl mx-auto mb-24 text-center animate-fade-in">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Our Mission</h2>
         <p className="text-lg text-slate-600 mb-4">
-          Empower every student to prepare confidently for interviews by learning from real, verified experiences.
+          Empower every student to prepare confidently for interviews by learning from real, peer-shared experiences.
         </p>
         <ul className="flex flex-wrap justify-center gap-4 mt-4">
           <li className="bg-indigo-50 text-indigo-500 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">Transparency</li>

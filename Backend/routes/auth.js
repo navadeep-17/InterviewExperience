@@ -77,15 +77,15 @@ router.post('/register', requireCollegeEmail, async (req, res) => {
       },
     });
 
-    let messageText = `Your OTP code is ${otp}`;
+    let messageText = `Your RoundRelay registration OTP is: ${otp}`;
     if (context === 'welcome') {
-      messageText = `Welcome to InterviewHub!\nYour OTP for registration is: ${otp}`;
+      messageText = `Welcome to RoundRelay!\nYour OTP for registration is: ${otp}`;
     }
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Your OTP Code',
+      subject: 'RoundRelay - Registration OTP',
       text: messageText,
     });
 
@@ -182,17 +182,18 @@ router.post('/send-otp', requireCollegeEmail, async (req, res) => {
     },
   });
 
-  let messageText = `Your OTP code is ${otp}`;
+  let messageText = `Your RoundRelay OTP code is: ${otp}. This OTP is valid for 5 minutes. Do not share it with anyone.`;
   if (context === 'welcome') {
-    messageText = `Welcome to CarerStories!\nYour OTP for registration is: ${otp}\nThis OTP is valid for 10 minutes.\nDo not share it with anyone.`;
+    messageText = `Welcome to RoundRelay!\nYour OTP for registration is: ${otp}\nThis OTP is valid for 5 minutes.\nDo not share it with anyone.`;
   } else if (context === 'reset') {
-    messageText = `Your OTP to reset your password is: ${otp}`;
+    messageText = `Your RoundRelay password reset OTP is: ${otp}. This OTP is valid for 5 minutes. Do not share it with anyone.`;
   }
 
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'CarerStories - Register OTP',
+    subject: context === 'welcome' ? 'RoundRelay - Registration OTP'
+      : context === 'reset' ? 'RoundRelay - Password Reset OTP' : 'RoundRelay - OTP Code',
     text: messageText,
   });
 
@@ -237,15 +238,15 @@ router.post('/forgot-password', requireCollegeEmail, async (req, res) => {
     },
   });
 
-  let messageText = `CareerStories password reset OTP: ${otp}. This one-time code is valid for 10 minutes. Do not share it with anyone.`;
+  let messageText = `RoundRelay password reset OTP: ${otp}. This one-time code is valid for 5 minutes. Do not share it with anyone.`;
   if (context === 'reset') {
-    messageText = `CareerStories password reset OTP: ${otp}. This one-time code is valid for 10 minutes. Do not share it with anyone.`;
+    messageText = `RoundRelay password reset OTP: ${otp}. This one-time code is valid for 5 minutes. Do not share it with anyone.`;
   }
 
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'CareerStories: Password Reset OTP',
+    subject: 'RoundRelay - Password Reset OTP',
     text: messageText,
   });
 

@@ -1067,3 +1067,33 @@ test('own profile initializes navigate before effect dependencies (authorized ba
   assert.ok(declaration < source.indexOf('[navigate]', start));
   assert.equal((source.match(/const navigate = useNavigate\(\);/g) || []).length, 1);
 });
+
+test('RoundRelay branding is consistent across public copy and package metadata', () => {
+  const landing = fs.readFileSync(frontendPath('LandingPage.jsx'), 'utf8');
+  const home = fs.readFileSync(frontendPath('HomePage.jsx'), 'utf8');
+  const frontendRoot = path.resolve(frontendPath('.'), '../..');
+  const html = fs.readFileSync(path.join(frontendRoot, 'index.html'), 'utf8');
+  const readme = fs.readFileSync(path.join(__dirname, '../../README.md'), 'utf8');
+  const packageJson = JSON.parse(fs.readFileSync(path.join(frontendRoot, 'package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(frontendRoot, 'package-lock.json'), 'utf8'));
+  const tagline = 'Real interview experiences, passed forward.';
+  assert.match(landing, /RoundRelay/);
+  assert.ok(landing.includes(tagline));
+  assert.match(landing, /Peer Shared/);
+  assert.match(landing, /real, peer-shared experiences/);
+  assert.doesNotMatch(landing, /Verified Stories|real, verified experiences/i);
+  assert.match(home, />RoundRelay<\/h2>/);
+  assert.ok(html.includes('<title>RoundRelay | Real Interview Experiences</title>'));
+  assert.ok(html.includes('<meta name="description" content="RoundRelay helps students share real interview experiences and pass useful interview knowledge forward." />'));
+  assert.doesNotMatch(html, /vite\.svg|rel="icon"/);
+  assert.match(readme, /^# RoundRelay\r?\n/);
+  assert.ok(readme.includes('> ' + tagline));
+  assert.equal(packageJson.name, 'roundrelay');
+  assert.equal(lock.name, 'roundrelay');
+  assert.equal(lock.packages[''].name, 'roundrelay');
+  for (const source of [landing, home, html, readme]) {
+    // The retained technical frontend directory is not a visible product label.
+    assert.doesNotMatch(source.replace(/Frontend\/interview(?:hub)\/?/g, ''), /(?:Career|Carer)Stories|Interview(?:Hub)/i);
+    for (const name of source.match(/roundrelay/gi) || []) assert.equal(name, 'RoundRelay');
+  }
+});

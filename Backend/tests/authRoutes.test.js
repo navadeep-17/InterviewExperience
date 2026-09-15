@@ -28,6 +28,15 @@ function assertEmailLookup(filter) {
   assert.deepEqual(filter, { email: /^student@mgit\.ac\.in$/i });
 }
 
+function assertRoundRelayMail(mail, subject) {
+  assert.equal(mail.to, account.email);
+  assert.equal(mail.subject, subject);
+  assert.match(mail.text, /RoundRelay/);
+  assert.doesNotMatch(mail.subject + '\n' + mail.text, /(?:Career|Carer)Stories|Interview(?:Hub)/i);
+  assert.doesNotMatch(mail.text, /10 minutes/);
+  if (/valid/i.test(mail.text)) assert.match(mail.text, /5 minutes/);
+}
+
 // Intentionally return extra fields even after select(), exercising the
 // serializer independently of the positive database projection.
 function selected(value, requiredFields = []) {
@@ -186,34 +195,46 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
       }
     });
   }
-  await t.test('registration normalizes email and preserves department/group/OTP flow', async t => {
-    t.mock.method(User, 'findOne', filter => {
-      assertEmailLookup(filter);
-      return selected(null);
+  for (const context of [undefined, 'welcome']) {
+    await t.test('registration normalizes email and preserves department/group/OTP flow: ' + String(context), async t => {
+      t.mock.method(User, 'findOne', filter => {
+        assertEmailLookup(filter);
+        return selected(null);
+      });
+      const savedUsers = [];
+      t.mock.method(User.prototype, 'save', async function () { savedUsers.push(this); return this; });
+      const group = { members: [], async save() {} };
+      t.mock.method(Group, 'findOne', async filter => {
+        assert.deepEqual(filter, { name: 'CSE' });
+        return group;
+      });
+      let sent = 0;
+      t.mock.method(nodemailer, 'createTransport', () => ({
+        async sendMail(mail) {
+          assertRoundRelayMail(mail, 'RoundRelay - Registration OTP');
+          assert.match(mail.text, /registration/i);
+          assert.ok(mail.text.includes(savedUsers[0].otp));
+          if (context === 'welcome') assert.match(mail.text, /Welcome to RoundRelay!/);
+          sent++;
+        },
+      }));
+      const before = Date.now();
+      const res = await request(server, 'POST', '/api/auth/register', {
+        email: ' STUDENT@MGIT.AC.IN ', name: 'Student', password: 'password-fixture',
+        department: 'CSE', graduationYear: '2027', context,
+      });
+      assert.equal(res.status, 201);
+      assert.equal(savedUsers.length, 2);
+      assert.equal(savedUsers[0].email, account.email);
+      assert.equal(savedUsers[0].isVerified, false);
+      assert.match(savedUsers[0].otp, /^\d{6}$/);
+      assert.ok(Number(savedUsers[0].otpExpiry) >= before + 300000);
+      assert.ok(Number(savedUsers[0].otpExpiry) <= Date.now() + 300000);
+      assert.equal(group.members.length, 1);
+      assert.equal(sent, 1);
+      assert.deepEqual(Object.keys(res.body), ['message']);
     });
-    const savedUsers = [];
-    t.mock.method(User.prototype, 'save', async function () { savedUsers.push(this); return this; });
-    const group = { members: [], async save() {} };
-    t.mock.method(Group, 'findOne', async filter => {
-      assert.deepEqual(filter, { name: 'CSE' });
-      return group;
-    });
-    let sent = 0;
-    t.mock.method(nodemailer, 'createTransport', () => ({
-      async sendMail(mail) { assert.equal(mail.to, account.email); sent++; },
-    }));
-    const res = await request(server, 'POST', '/api/auth/register', {
-      email: ' STUDENT@MGIT.AC.IN ', name: 'Student', password: 'password-fixture',
-      department: 'CSE', graduationYear: '2027',
-    });
-    assert.equal(res.status, 201);
-    assert.equal(savedUsers.length, 2);
-    assert.equal(savedUsers[0].email, account.email);
-    assert.equal(savedUsers[0].isVerified, false);
-    assert.equal(group.members.length, 1);
-    assert.equal(sent, 1);
-    assert.deepEqual(Object.keys(res.body), ['message']);
-  });
+  }
   await t.test('registration rejects a mixed-case legacy duplicate without saving a new user', async t => {
     const legacyUser = { ...account, email: 'Student@mgit.ac.in' };
     t.mock.method(User, 'findOne', filter => {
@@ -292,25 +313,49 @@ test('auth/user HTTP acceptance matrix (isolated database, JWT and mail mocks)',
     assert.equal(user.otpExpiry, undefined);
     assert.deepEqual(Object.keys(res.body), ['message']);
   });
-  for (const path of ['send-otp', 'forgot-password']) {
-    await t.test(path + ' normalizes email and preserves OTP delivery', async t => {
+  for (const [path, context] of [
+    ['send-otp', undefined], ['send-otp', 'welcome'], ['send-otp', 'reset'], ['send-otp', 'other'],
+    ['forgot-password', undefined], ['forgot-password', 'reset'],
+  ]) {
+    await t.test(path + ' normalizes email and preserves OTP delivery: ' + String(context), async t => {
       let saved = false;
+      let deliveredOtp;
+      const before = Date.now();
       const user = { ...account, email: 'Student@mgit.ac.in', async save() { saved = true; } };
       const query = path === 'send-otp' ? 'findOneAndUpdate' : 'findOne';
       t.mock.method(User, query, (filter, update) => {
         assertEmailLookup(filter);
         if (update) {
           assert.deepEqual(Object.keys(update).sort(), ['otp', 'otpExpiry']);
+          assert.match(update.otp, /^\d{6}$/);
+          assert.ok(update.otpExpiry >= before + 300000);
+          assert.ok(update.otpExpiry <= Date.now() + 300000);
+          deliveredOtp = update.otp;
           saved = true;
         }
         return selected(filter.email.test(user.email) ? user : null);
       });
       let sent = false;
       t.mock.method(nodemailer, 'createTransport', () => ({
-        async sendMail(mail) { assert.equal(mail.to, account.email); sent = true; },
+        async sendMail(mail) {
+          const reset = path === 'forgot-password' || context === 'reset';
+          const subject = reset ? 'RoundRelay - Password Reset OTP'
+            : context === 'welcome' ? 'RoundRelay - Registration OTP' : 'RoundRelay - OTP Code';
+          assertRoundRelayMail(mail, subject);
+          assert.match(mail.text, /5 minutes/);
+          if (reset) assert.match(mail.text, /password reset/i);
+          if (context === 'welcome') assert.match(mail.text, /Welcome to RoundRelay!.*registration/s);
+          assert.ok(mail.text.includes(path === 'send-otp' ? deliveredOtp : user.otp));
+          sent = true;
+        },
       }));
-      const res = await request(server, 'POST', '/api/auth/' + path, { email: ' STUDENT@MGIT.AC.IN ' });
+      const res = await request(server, 'POST', '/api/auth/' + path, { email: ' STUDENT@MGIT.AC.IN ', context });
       assert.equal(res.status, 200);
+      if (path === 'forgot-password') {
+        assert.match(user.otp, /^\d{6}$/);
+        assert.ok(user.otpExpiry >= before + 300000);
+        assert.ok(user.otpExpiry <= Date.now() + 300000);
+      }
       assert.equal(saved && sent, true);
       assert.deepEqual(Object.keys(res.body), ['message']);
     });
