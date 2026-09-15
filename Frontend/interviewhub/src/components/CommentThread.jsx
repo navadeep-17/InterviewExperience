@@ -96,7 +96,10 @@ const CommentThread = ({
                     </button>
                     <button
                       className="text-xs text-red-500 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
-                      onClick={() => handleDeleteComment(expId, comment._id)}
+                      onClick={() => {
+                        if (!window.confirm('Delete this comment? Any replies under it will also be removed.')) return;
+                        handleDeleteComment(expId, comment._id);
+                      }}
                       title="Delete"
                     >
                       Delete

@@ -32,11 +32,11 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center z-50">
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90dvh]">
+      <div role="dialog" aria-modal="true" aria-labelledby={`experience-${mode}-title`} className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90dvh]">
         <button onClick={onClose} aria-label="Close experience editor" className="absolute top-3 right-3 p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-xl font-bold mb-5 pr-10 text-slate-900">{mode === 'edit' ? 'Edit Your Interview Experience' : 'Share Your Interview Experience'}</h2>
+        <h2 id={`experience-${mode}-title`} className="text-xl font-bold mb-5 pr-10 text-slate-900">{mode === 'edit' ? 'Edit Your Interview Experience' : 'Share Your Interview Experience'}</h2>
         <form onSubmit={handleFormSubmit} className="space-y-4">
           <input aria-label="Company"
             type="text"

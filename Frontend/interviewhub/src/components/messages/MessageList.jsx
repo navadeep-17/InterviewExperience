@@ -31,6 +31,7 @@ function getDateLabel(dateString) {
 export default function MessageList({ currentUser, selectedUser, selectedGroup, currentMessages, groupMessages,
   page, hasMore, loadingMore, isTyping, onLoadMore, handleDeleteMessage, handleDeleteGroupMessage }) {
   const [dropdownOpen, setDropdownOpen] = useState(null);
+  const initialLoading = loadingMore && (page === 1 || Boolean(selectedGroup));
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef();
   // Page controls whether a message change scrolls; pagination alone is not a scroll trigger.
@@ -74,6 +75,15 @@ export default function MessageList({ currentUser, selectedUser, selectedGroup, 
           <span className="text-xs text-slate-500">Loading...</span>
         </div>
       )}
+      {!selectedUser && !selectedGroup && (
+        <p className="text-center text-slate-500 py-10">Choose a conversation to start messaging.</p>
+      )}
+      {selectedUser && currentMessages.length === 0 && !initialLoading && (
+        <p className="text-center text-slate-500 py-10">No messages yet. Start the conversation.</p>
+      )}
+      {selectedGroup && groupMessages.length === 0 && !initialLoading && (
+        <p className="text-center text-slate-500 py-10">No messages in this group yet.</p>
+      )}
       {/* Render group messages */}
       {selectedGroup &&
         groupMessages.map((msg, idx) => {
@@ -113,6 +123,7 @@ export default function MessageList({ currentUser, selectedUser, selectedGroup, 
                           <button
                             className="block w-full text-left px-4 py-2.5 text-sm hover:bg-red-100 text-red-600 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl"
                             onClick={() => {
+                              if (!window.confirm('Delete this message? It will be removed for everyone.')) return;
                               handleDeleteGroupMessage(msg._id);
                               setDropdownOpen(null);
                             }}
@@ -219,6 +230,7 @@ export default function MessageList({ currentUser, selectedUser, selectedGroup, 
                             <button
                               className="block w-full text-left px-4 py-2.5 text-sm hover:bg-red-100 text-red-600 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl"
                               onClick={() => {
+                                if (!window.confirm('Delete this message? It will be removed for everyone.')) return;
                                 handleDeleteMessage(msg._id);
                                 setDropdownOpen(null);
                               }}
