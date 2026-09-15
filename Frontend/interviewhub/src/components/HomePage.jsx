@@ -144,6 +144,17 @@ const HomePage = () => {
             onSearch={data.search} onSortChange={data.setSortOrder} />
           <ExperienceFeed data={data} user={user} onEditExperience={setEditExperience} />
 
+          {data.page < data.totalPages && (
+            <div className="text-center mt-4">
+              <button
+                onClick={data.loadMore}
+                className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
+              >
+                Load More
+              </button>
+            </div>
+          )}
+
           {/* Floating CTA */}
           <div className="fixed bottom-5 right-4 sm:right-6 z-20">
             <button onClick={() => setShowForm(true)} className="bg-indigo-600 text-white rounded-xl px-5 py-3 shadow-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
@@ -165,17 +176,6 @@ const HomePage = () => {
           if (saved) setEditExperience(null);
           return saved;
         }} />}
-
-      {data.page < data.totalPages && (
-        <div className="text-center mt-4">
-          <button
-            onClick={data.loadMore}
-            className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
-          >
-            Load More
-          </button>
-        </div>
-      )}
     </div>
   );
 };

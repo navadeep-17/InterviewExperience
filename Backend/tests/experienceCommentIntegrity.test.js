@@ -541,6 +541,22 @@ test('CommentThread limits Reply control/input and uses consistent edit/save arg
   assert.ok(profileFeed.includes('data.editComment(postId, commentId, editingCommentText,'));
 });
 
+test('HomePage keeps Load More inside the feed content column', () => {
+  const home = fs.readFileSync(frontendPath('HomePage.jsx'), 'utf8');
+  const feedIndex = home.indexOf('<ExperienceFeed');
+  const loadMoreIndex = home.indexOf('{data.page < data.totalPages && (');
+  const floatingCtaIndex = home.indexOf('{/* Floating CTA */}');
+  const modalIndex = home.indexOf('<ExperienceFormModal');
+
+  assert.notEqual(feedIndex, -1);
+  assert.notEqual(loadMoreIndex, -1);
+  assert.notEqual(floatingCtaIndex, -1);
+  assert.notEqual(modalIndex, -1);
+  assert.ok(feedIndex < loadMoreIndex, 'Load More follows the experience feed');
+  assert.ok(loadMoreIndex < floatingCtaIndex, 'Load More precedes the floating CTA');
+  assert.ok(floatingCtaIndex < modalIndex, 'The feed content precedes the modals');
+});
+
 test('HomePage composes one feed hook and extracted UI without duplicating transport', () => {
   const home = fs.readFileSync(frontendPath('HomePage.jsx'), 'utf8');
   for (const component of ['ExperienceFilters', 'ExperienceFeed', 'ExperienceFormModal']) {
