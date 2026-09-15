@@ -43,3 +43,7 @@ jobs:
       - name: Lint frontend
         run: npm run lint -- --max-warnings=0
       - run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests
+        run: npm run test:e2e

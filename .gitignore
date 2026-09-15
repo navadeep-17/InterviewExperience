@@ -12,6 +12,8 @@ build/
 dist/
 dist-ssr/
 coverage/
+playwright-report/
+test-results/
 
 # Logs
 logs/
