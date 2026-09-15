@@ -70,7 +70,7 @@ const HomePage = () => {
       {/* Sidebar */}
       <aside className={`bg-blue-800 text-white ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 flex flex-col`}>
         <div className="p-4 flex items-center justify-between">
-          {sidebarOpen && <h2 className="text-xl font-bold">InterviewHub</h2>}
+          {sidebarOpen && <h2 className="text-xl font-bold">RoundRelay</h2>}
           <button onClick={toggleSidebar} className="p-2 rounded-lg hover:bg-blue-700">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
