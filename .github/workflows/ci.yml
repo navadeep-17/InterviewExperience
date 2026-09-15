@@ -40,4 +40,6 @@ jobs:
           cache: npm
           cache-dependency-path: Frontend/interviewhub/package-lock.json
       - run: npm ci
+      - name: Lint frontend
+        run: npm run lint -- --max-warnings=0
       - run: npm run build
