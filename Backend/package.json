@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test tests/userPolicy.test.js tests/authRoutes.test.js tests/realtime.test.js tests/messageAuthorization.test.js tests/experienceCommentIntegrity.test.js"
+    "test": "node --test tests/userPolicy.test.js tests/authRoutes.test.js tests/realtime.test.js tests/messageAuthorization.test.js tests/experienceCommentIntegrity.test.js tests/deploymentReadiness.test.js"
   },
   "keywords": [],
   "author": "",
