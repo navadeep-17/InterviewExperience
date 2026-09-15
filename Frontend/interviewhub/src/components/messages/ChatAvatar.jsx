@@ -3,12 +3,12 @@ const ChatAvatar = ({ user, size = 32 }) => (
     <img
       src={user.avatar}
       alt={user.name}
-      className="rounded-full object-cover"
+      className="shrink-0 rounded-full object-cover"
       style={{ width: size, height: size }}
     />
   ) : (
     <div
-      className="rounded-full bg-blue-200 flex items-center justify-center font-bold text-blue-800"
+      className="shrink-0 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-700"
       style={{ width: size, height: size }}
     >
       {user?.name?.charAt(0) || "?"}

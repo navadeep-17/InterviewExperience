@@ -84,10 +84,10 @@ export default function ExperienceFeed({ data, user, onEditExperience }) {
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full px-2 sm:px-0">
-      {loading && <div className="text-center py-10 text-gray-500">Loading experiences...</div>}
+      {loading && <div className="text-center py-10 text-slate-500">Loading experiences...</div>}
       {error && <div className="text-center py-10 text-red-500">{error}</div>}
       {!loading && !error && experiences.length === 0 && (
-        <div className="text-center py-10 text-gray-500">
+        <div className="text-center py-10 text-slate-500">
           No experiences found matching your criteria.
         </div>
       )}

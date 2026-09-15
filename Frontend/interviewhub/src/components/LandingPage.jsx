@@ -5,42 +5,42 @@ export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] relative font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 px-5 sm:px-8 lg:px-12 pb-12">
       {/* Header */}
-      <header className="flex justify-between items-center px-8 py-6">
+      <header className="max-w-6xl mx-auto flex justify-between items-center gap-4 py-6 sm:py-8 border-b border-slate-200">
         <span
-          className="text-4xl md:text-5xl font-extrabold text-indigo-600 tracking-tight relative cursor-pointer transition-all duration-300
-            after:content-[''] after:block after:h-0.5 after:bg-pink-400 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left"
+          className="text-2xl sm:text-3xl font-bold text-indigo-700 tracking-tight"
         >
           RoundRelay
         </span>
         <button
-          className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center border border-indigo-100 hover:bg-indigo-50 transition-transform duration-200 hover:scale-110"
+          className="flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
           onClick={() => navigate("/login")}
           aria-label="Sign In / Sign Up"
         >
-          <User2 className="text-indigo-500" size={38} />
+          <User2 className="shrink-0" size={20} />
+          <span>Sign in</span>
         </button>
       </header>
 
       {/* Hero/About */}
-      <section className="max-w-3xl mx-auto text-center mt-16 mb-20 animate-fade-in">
-        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-6 transition-all duration-700 hover:text-indigo-600">
+      <section className="max-w-3xl mx-auto text-center py-16 sm:py-24 animate-fade-in">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-slate-900 mb-6">
           Real interview experiences, passed forward.
         </h1>
-        <p className="text-lg text-slate-600 mb-8">
+        <p className="text-base sm:text-lg leading-relaxed text-slate-600 mb-8">
           RoundRelay is a peer-driven platform where students share real interview journeys, learn from peers and seniors, and pass useful knowledge forward to prepare for interviews and placements.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
-          <span className="px-4 py-2 bg-indigo-100 text-indigo-600 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Community Driven</span>
-          <span className="px-4 py-2 bg-pink-100 text-pink-500 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-pink-200">Peer Shared</span>
-          <span className="px-4 py-2 bg-indigo-50 text-indigo-400 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">For Students, By Students</span>
+          <span className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Community Driven</span>
+          <span className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Peer Shared</span>
+          <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">For Students, By Students</span>
         </div>
       </section>
 
       {/* Success Stories */}
-      <section className="max-w-5xl mx-auto mb-20 animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Recent Success Stories</h2>
+      <section className="max-w-6xl mx-auto mb-16 sm:mb-20 animate-fade-in">
+        <h2 className="text-2xl font-bold text-slate-900 mb-6">Recent Success Stories</h2>
         <div className="grid md:grid-cols-3 gap-6">
           <StoryCard
             title="Google SDE Intern"
@@ -64,8 +64,8 @@ export default function LandingPage() {
       </section>
 
       {/* User Feedback */}
-      <section className="bg-white/70 backdrop-blur rounded-3xl max-w-5xl mx-auto py-12 px-6 mb-20 shadow animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-800 mb-8 text-center">What Our Users Say</h2>
+      <section className="bg-white border border-slate-200 rounded-2xl max-w-6xl mx-auto p-6 sm:p-10 mb-16 sm:mb-20 shadow-sm animate-fade-in">
+        <h2 className="text-2xl font-bold text-slate-900 mb-8 text-center">What Our Users Say</h2>
         <div className="flex flex-col md:flex-row gap-8 justify-center">
           <FeedbackCard
             text="Helped me crack my Amazon SDE interview! Great insights from past experiences."
@@ -79,15 +79,15 @@ export default function LandingPage() {
       </section>
 
       {/* Goals & Aims */}
-      <section className="max-w-4xl mx-auto mb-24 text-center animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Our Mission</h2>
+      <section className="max-w-4xl mx-auto pt-4 pb-12 text-center border-b border-slate-200 animate-fade-in">
+        <h2 className="text-2xl font-bold text-slate-900 mb-6">Our Mission</h2>
         <p className="text-lg text-slate-600 mb-4">
           Empower every student to prepare confidently for interviews by learning from real, peer-shared experiences.
         </p>
         <ul className="flex flex-wrap justify-center gap-4 mt-4">
-          <li className="bg-indigo-50 text-indigo-500 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">Transparency</li>
-          <li className="bg-pink-50 text-pink-400 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-pink-100">Support</li>
-          <li className="bg-indigo-100 text-indigo-600 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Growth</li>
+          <li className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">Transparency</li>
+          <li className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-100">Support</li>
+          <li className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:bg-indigo-200">Growth</li>
         </ul>
       </section>
 
@@ -99,7 +99,10 @@ export default function LandingPage() {
             to { opacity: 1; transform: translateY(0);}
           }
           .animate-fade-in {
-            animation: fade-in 0.8s cubic-bezier(.4,0,.2,1) both;
+            animation: fade-in 0.5s ease-out both;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .animate-fade-in { animation: none; }
           }
         `}
       </style>
@@ -109,12 +112,12 @@ export default function LandingPage() {
 
 function StoryCard({ title, desc, author, date }) {
   return (
-    <div className="bg-white rounded-2xl shadow p-6 flex flex-col gap-2 border border-slate-100 transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-      <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+    <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col gap-2 border border-slate-200 transition-shadow duration-200 hover:shadow-md">
+      <h3 className="font-bold text-lg text-slate-900">{title}</h3>
       <p className="text-slate-600 text-sm flex-1">{desc}</p>
       <div className="flex items-center justify-between mt-2">
-        <span className="text-indigo-600 font-semibold text-sm">by {author}</span>
-        <span className="text-slate-400 text-xs">{date}</span>
+        <span className="text-indigo-700 font-semibold text-sm">by {author}</span>
+        <span className="text-slate-500 text-xs">{date}</span>
       </div>
     </div>
   );
@@ -122,9 +125,9 @@ function StoryCard({ title, desc, author, date }) {
 
 function FeedbackCard({ text, user }) {
   return (
-    <div className="bg-indigo-50 rounded-xl p-6 shadow flex-1 text-slate-700 transition-transform duration-300 hover:scale-105 hover:shadow-xl">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 flex-1 text-slate-600 transition-shadow duration-200 hover:shadow-md">
       <p className="mb-4">&quot;{text}&quot;</p>
-      <div className="text-indigo-600 font-semibold text-right">– {user}</div>
+      <div className="text-indigo-700 font-semibold text-right">– {user}</div>
     </div>
   );
 }

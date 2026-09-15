@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body { @apply m-0 bg-slate-50 text-slate-900 antialiased; }
+  ::selection { @apply bg-indigo-100 text-indigo-900; }
+}

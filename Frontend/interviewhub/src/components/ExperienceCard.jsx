@@ -47,11 +47,9 @@ const ExperienceCard = ({
   const isProfilePage = location.pathname === "/profile";
 
   return (
-    <div className="bg-white shadow-md rounded-xl p-5 border border-slate-200 mb-2
-                    w-full max-w-2xl mx-auto
-                    sm:p-6 sm:mb-4">
+    <div className="bg-white shadow-sm rounded-2xl p-4 sm:p-6 border border-slate-200 w-full min-w-0 max-w-2xl mx-auto break-words">
       <div className="flex items-center gap-4 mb-3">
-        <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
+        <div className="shrink-0 w-11 h-11 rounded-full bg-slate-200 overflow-hidden">
           <img
             src={
               exp.user?.avatar
@@ -64,9 +62,9 @@ const ExperienceCard = ({
             className="w-full h-full object-cover"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <p
-            className={`font-semibold text-gray-800 cursor-pointer transition-colors duration-200
+            className={`font-semibold text-slate-900 cursor-pointer transition-colors duration-200
               ${user && exp.user?._id !== user._id ? "hover:underline hover:text-indigo-600" : ""}
             `}
             onClick={() => {
@@ -79,7 +77,7 @@ const ExperienceCard = ({
           >
             {exp.user?.name || 'Unknown'}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             Posted on {new Date(exp.date || exp.createdAt).toLocaleString('en-US', {
               weekday: 'short',
               year: 'numeric',
@@ -91,28 +89,28 @@ const ExperienceCard = ({
           </p>
         </div>
       </div>
-      <h3 className="text-lg font-semibold text-blue-700 mb-1">{exp.company}</h3>
+      <h3 className="text-lg font-semibold text-indigo-700 mb-1">{exp.company}</h3>
       <div className="flex flex-wrap gap-2 mb-2">
-        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{exp.role}</span>
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-          exp.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
-          exp.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+        <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{exp.role}</span>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+          exp.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-700' :
+          exp.difficulty === 'Medium' ? 'bg-amber-100 text-amber-700' :
           'bg-red-100 text-red-700'
         }`}>{exp.difficulty}</span>
-        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs font-medium">{exp.user?.department}</span>
+        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-xs font-medium">{exp.user?.department}</span>
         {exp.roundDate && (
-          <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">
+          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">
             {new Date(exp.roundDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
           </span>
         )}
       </div>
-      <p className="text-gray-800 mb-4">
+      <p className="text-slate-600 leading-relaxed mb-4">
         {exp.description.length > 200 && !expandedDescriptions[exp._id]
           ? (
             <>
               {exp.description.slice(0, 200)}...
               <button
-                className="text-blue-600 ml-2 text-xs underline"
+                className="text-indigo-600 ml-2 text-xs underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                 onClick={() => toggleDescription(exp._id)}
               >
                 Read more
@@ -124,7 +122,7 @@ const ExperienceCard = ({
               {exp.description}
               {exp.description.length > 200 && (
                 <button
-                  className="text-blue-600 ml-2 text-xs underline"
+                  className="text-indigo-600 ml-2 text-xs underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                   onClick={() => toggleDescription(exp._id)}
                 >
                   Show less
@@ -137,19 +135,19 @@ const ExperienceCard = ({
       {exp.rounds && exp.rounds.length > 0 && (
         <div className="mb-4">
           <button
-            className="font-semibold text-gray-700 mb-2 flex items-center gap-2 text-sm"
+            className="font-semibold text-slate-700 mb-2 flex items-center gap-2 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl"
             onClick={() => toggleRounds(exp._id)}
           >
             Interview Rounds
-            <span className="text-blue-500">{expandedRounds[exp._id] ? '▲' : '▼'}</span>
+            <span className="text-indigo-500">{expandedRounds[exp._id] ? '▲' : '▼'}</span>
           </button>
           {expandedRounds[exp._id] && (
-            <ul className="space-y-2 text-sm text-gray-700 mt-2">
+            <ul className="space-y-2 text-sm text-slate-700 mt-2">
               {exp.rounds.map((round, idx) => (
-                <li key={idx} className="border border-gray-200 p-3 rounded-lg bg-gray-50">
-                  <p className="font-semibold text-blue-600">{round.roundName}</p>
-                  <p><span className="font-medium text-gray-600">Questions:</span> {round.questions}</p>
-                  <p><span className="font-medium text-gray-600">Duration:</span> {round.duration}</p>
+                <li key={idx} className="border border-slate-200 p-3 rounded-xl bg-slate-50">
+                  <p className="font-semibold text-indigo-600">{round.roundName}</p>
+                  <p><span className="font-medium text-slate-600">Questions:</span> {round.questions}</p>
+                  <p><span className="font-medium text-slate-600">Duration:</span> {round.duration}</p>
                 </li>
               ))}
             </ul>
@@ -158,21 +156,21 @@ const ExperienceCard = ({
       )}
       {exp.tips && (
         <div className="mb-4">
-          <h4 className="font-semibold text-gray-700 mb-1">Tips:</h4>
-          <p className="text-sm text-gray-600">{exp.tips}</p>
+          <h4 className="font-semibold text-slate-700 mb-1">Tips:</h4>
+          <p className="text-sm text-slate-600">{exp.tips}</p>
         </div>
       )}
       {isProfilePage && user && exp.user?._id === user._id && (
         <div className="flex gap-4 mt-2">
           <button
             onClick={() => handleEditExperience(exp)}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-indigo-600 hover:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
           >
             Edit
           </button>
           <button
             onClick={() => handleDeleteExperience(exp._id)}
-            className="text-sm text-red-600 hover:underline"
+            className="text-sm text-red-600 hover:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
           >
             Delete
           </button>
@@ -180,34 +178,34 @@ const ExperienceCard = ({
       )}
       <div className="flex items-center justify-between gap-2 mt-4 flex-wrap">
         {/* Votes */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="hover:bg-blue-50 rounded-full p-2 transition"
+            className="hover:bg-indigo-50 rounded-xl p-2.5 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
             aria-label="Upvote"
             onClick={() => handleUpvote(exp._id)}
             disabled={voteLoading}
           >
-            <ArrowBigUp className="w-7 h-7 sm:w-9 sm:h-9" />
+            <ArrowBigUp className="w-5 h-5" />
           </button>
-          <span className="font-semibold text-green-700 text-base sm:text-lg">{exp.upvotes || 0}</span>
+          <span className="font-semibold text-slate-600 text-sm">{exp.upvotes || 0}</span>
           <button
             type="button"
-            className="hover:bg-red-50 rounded-full p-2 transition"
+            className="hover:bg-slate-100 rounded-xl p-2.5 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
             aria-label="Downvote"
             onClick={() => handleDownvote(exp._id)}
             disabled={voteLoading}
           >
-            <ArrowBigDown className="w-7 h-7 sm:w-9 sm:h-9" />
+            <ArrowBigDown className="w-5 h-5" />
           </button>
-          <span className="font-semibold text-red-700 text-base sm:text-lg">{exp.downvotes || 0}</span>
+          <span className="font-semibold text-slate-600 text-sm">{exp.downvotes || 0}</span>
         </div>
         {/* Comments */}
         <button
-          className="flex items-center gap-1 text-blue-700 font-semibold"
+          className="flex items-center gap-1 text-indigo-700 font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl"
           onClick={() => toggleComments(exp._id)}
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-5 h-5" />
           {commentCounts[exp._id] > 0 ? (
             <span>
               {commentCounts[exp._id]} Comment{commentCounts[exp._id] !== 1 ? 's' : ''}

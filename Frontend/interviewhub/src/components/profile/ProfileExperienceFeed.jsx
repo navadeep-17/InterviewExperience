@@ -100,10 +100,10 @@ export default function ProfileExperienceFeed({ data, mode, viewer, onEditExperi
     setEditingCommentText('');
   });
 
-  if (mode === 'own' && postsLoading) return <div className="text-gray-400">Loading posts...</div>;
+  if (mode === 'own' && postsLoading) return <div className="text-slate-500">Loading posts...</div>;
   if (experiences.length === 0) return mode === 'own'
-    ? <div className="text-gray-500">You haven't posted anything yet.</div>
-    : <div className="text-gray-400 italic">No posts shared yet.</div>;
+    ? <div className="text-slate-500">You haven't posted anything yet.</div>
+    : <div className="text-slate-500 py-8 text-center">No posts shared yet.</div>;
 
   return (
     <div className={mode === 'own' ? 'space-y-6' : 'space-y-8'}>
@@ -152,7 +152,7 @@ export default function ProfileExperienceFeed({ data, mode, viewer, onEditExperi
           />
         );
         return mode === 'public'
-          ? <div key={post._id} className="rounded-xl shadow-lg bg-white/90 border border-blue-100 p-4">{card}</div>
+          ? <div key={post._id} className="min-w-0">{card}</div>
           : card;
       })}
     </div>

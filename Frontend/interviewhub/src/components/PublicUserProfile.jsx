@@ -65,41 +65,41 @@ const PublicUserProfile = () => {
     fetchUserAndExperiences();
   }, [id, navigate, loadExperiences]);
 
-  if (loading) return <div className="text-center mt-10">Loading...</div>;
+  if (loading) return <div className="text-center py-10 text-slate-500">Loading...</div>;
   if (!userInfo) return <div className="text-center mt-10 text-red-500">User not found.</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-blue-50 to-white flex items-center justify-center py-8 px-2">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-0 sm:p-0 overflow-hidden">
+    <div className="min-h-screen bg-slate-50 py-6 sm:py-10 px-4 sm:px-6">
+      <div className="w-full max-w-3xl mx-auto">
         {/* Profile Header */}
-        <div className="relative bg-gradient-to-r from-blue-600 to-indigo-500 p-8 flex items-center">
-          <div className="w-28 h-28 rounded-full border-4 border-white shadow-xl bg-gray-200 overflow-hidden flex items-center justify-center">
+        <div className="relative bg-white border border-slate-200 rounded-2xl shadow-sm p-5 pt-20 sm:p-6 sm:pt-20 flex flex-col sm:flex-row items-start gap-5">
+          <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-indigo-50 bg-indigo-100 overflow-hidden flex items-center justify-center">
             {userInfo.avatar ? (
               <img src={userInfo.avatar} alt="User Avatar" className="w-full h-full object-cover" />
             ) : (
-              <User className="w-16 h-16 text-gray-400" />
+              <User className="w-16 h-16 text-slate-500" />
             )}
           </div>
-          <div className="ml-8 flex-1">
-            <h1 className="text-4xl font-extrabold text-white drop-shadow">{userInfo.name || "Unknown User"}</h1>
-            <p className="text-indigo-100 text-lg">{userInfo.department || "Department not set"}</p>
-            <p className="text-blue-200 text-sm">
+          <div className="min-w-0 w-full flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">{userInfo.name || "Unknown User"}</h1>
+            <p className="text-slate-600 text-base">{userInfo.department || "Department not set"}</p>
+            <p className="text-slate-500 text-sm">
               {userInfo.graduationYear && <>Graduation: {userInfo.graduationYear}</>}
             </p>
-            <div className="flex justify-end mt-4">
+            <div className="flex mt-4">
               <button
                 onClick={() => navigate(`/message?user=${userInfo._id}`)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition font-semibold"
+                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-indigo-700 transition font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
               >
                 <MessageCircle className="w-5 h-5" />
                 Send Message
               </button>
             </div>
           </div>
-          <div className="absolute top-6 right-6">
+          <div className="absolute top-4 right-4">
             <button
               onClick={() => navigate(-1)}
-              className="bg-white text-blue-700 px-4 py-2 rounded-lg shadow hover:bg-blue-100 transition font-semibold"
+              className="bg-white text-indigo-700 px-4 py-2.5 rounded-xl shadow-sm hover:bg-indigo-100 transition font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
             >
               ← Back
             </button>
@@ -107,12 +107,12 @@ const PublicUserProfile = () => {
         </div>
 
         {/* Divider */}
-        <hr className="my-0 border-blue-100" />
+        <hr className="my-6 border-slate-200" />
 
         {/* Posts Section */}
-        <div className="p-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-white min-h-[300px]">
-          <h2 className="text-2xl font-bold mb-6 text-blue-700 flex items-center gap-2">
-            <span className="inline-block w-2 h-6 bg-blue-500 rounded-full mr-2"></span>
+        <div className="min-h-[300px]">
+          <h2 className="text-xl font-bold mb-4 text-slate-900 flex items-center gap-2">
+            <span className="inline-block w-2 h-6 bg-indigo-500 rounded-full mr-2"></span>
             Posts
           </h2>
           <ProfileExperienceFeed data={data} mode="public" viewer={currentUser} retainedState={feedState} />

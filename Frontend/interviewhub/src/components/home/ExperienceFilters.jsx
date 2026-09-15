@@ -14,33 +14,33 @@ export default function ExperienceFilters({ sortOrder, onFiltersChange, onSearch
         e.preventDefault();
         onSearch(filters);
       }}
-      className="mb-8 flex flex-wrap gap-3 items-center bg-white/80 shadow-lg rounded-xl px-6 py-4"
+      className="mb-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-5"
     >
       <input
         type="text"
-        placeholder="Company"
+        aria-label="Company filter" placeholder="Company"
         value={filters.company}
         onChange={e => handleChange('company', e.target.value)}
-        className="border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition w-40"
+        className="border px-3 py-2.5 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition w-full min-w-0 focus:outline-none border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
       />
       <input
         type="text"
-        placeholder="Role"
+        aria-label="Role filter" placeholder="Role"
         value={filters.role}
         onChange={e => handleChange('role', e.target.value)}
-        className="border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition w-40"
+        className="border px-3 py-2.5 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition w-full min-w-0 focus:outline-none border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
       />
       <input
         type="text"
-        placeholder="Department"
+        aria-label="Department filter" placeholder="Department"
         value={filters.department}
         onChange={e => handleChange('department', e.target.value)}
-        className="border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition w-40"
+        className="border px-3 py-2.5 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition w-full min-w-0 focus:outline-none border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
       />
       <select
-        value={filters.difficulty}
+        aria-label="Difficulty filter" value={filters.difficulty}
         onChange={e => handleChange('difficulty', e.target.value)}
-        className="border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition w-44"
+        className="border px-3 py-2.5 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition w-full min-w-0 focus:outline-none border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
       >
         <option value="">All Difficulties</option>
         <option value="Easy">Easy</option>
@@ -48,16 +48,16 @@ export default function ExperienceFilters({ sortOrder, onFiltersChange, onSearch
         <option value="Hard">Hard</option>
       </select>
       <select
-        value={sortOrder}
+        aria-label="Sort experiences" value={sortOrder}
         onChange={e => onSortChange(e.target.value)}
-        className="border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition w-36"
+        className="border px-3 py-2.5 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition w-full min-w-0 focus:outline-none border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
       >
         <option value="latest">Latest</option>
         <option value="oldest">Oldest</option>
       </select>
       <button
         type="submit"
-        className="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition font-semibold"
+        className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl shadow-sm hover:bg-indigo-700 transition font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
       >
            Search
       </button>

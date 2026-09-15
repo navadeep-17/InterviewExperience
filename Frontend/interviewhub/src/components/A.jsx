@@ -174,16 +174,20 @@ function AuthForm() {
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 px-4 py-12">
-      <div className="max-w-4xl w-full flex flex-col md:flex-row rounded-3xl shadow-2xl overflow-hidden bg-white border border-gray-100">
-        <div className="md:w-1/2 p-10 flex flex-col justify-center">
-          <div className="flex justify-center mb-10">
-            <div className="flex bg-gray-100 rounded-full overflow-hidden w-full max-w-xs shadow">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12">
+      <div className="max-w-lg w-full rounded-2xl shadow-sm bg-white border border-slate-200">
+        <div className="w-full p-6 sm:p-8 flex flex-col justify-center">
+          <div className="text-center mb-8">
+            <p className="text-2xl font-bold tracking-tight text-indigo-700">RoundRelay</p>
+            <p className="mt-2 text-sm text-slate-600">Real interview experiences, passed forward.</p>
+          </div>
+          <div className="flex justify-center mb-6">
+            <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-full">
               <button
-                className={`w-1/2 py-2 text-base font-bold transition-all duration-200 ${
+                className={`focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors w-1/2 rounded-xl py-2.5 text-sm font-semibold transition-colors duration-200 ${
                   isSignIn
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-gray-700 hover:bg-blue-50'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-700 hover:bg-indigo-50'
                 }`}
                 onClick={() => setIsSignIn(true)}
                 type="button"
@@ -191,10 +195,10 @@ function AuthForm() {
                 Sign In
               </button>
               <button
-                className={`w-1/2 py-2 text-base font-bold transition-all duration-200 ${
+                className={`focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors w-1/2 rounded-xl py-2.5 text-sm font-semibold transition-colors duration-200 ${
                   !isSignIn
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-gray-700 hover:bg-blue-50'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-700 hover:bg-indigo-50'
                 }`}
                 onClick={() => setIsSignIn(false)}
                 type="button"
@@ -204,7 +208,7 @@ function AuthForm() {
             </div>
           </div>
 
-          <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">
+          <h2 className="text-2xl font-bold text-center text-slate-900 mb-6 tracking-tight">
             {isSignIn ? 'Welcome Back!' : 'Create Your Account'}
           </h2>
 
@@ -219,7 +223,7 @@ function AuthForm() {
               />
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
               >
                 Verify OTP
               </button>
@@ -235,10 +239,11 @@ function AuthForm() {
                   <InputField placeholder="Graduation Year" name="gradYear" type="text" value={formData.gradYear} onChange={handleChange} />
                   <div className="relative">
                     <select
+                      aria-label="Department"
                       name="major"
                       value={formData.major}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 focus:outline-none min-w-0 bg-white text-slate-900 placeholder:text-slate-500"
                       required // <-- This makes the department compulsory
                     >
                       <option value="" disabled>Select Department</option>
@@ -250,12 +255,12 @@ function AuthForm() {
                 </>
               )}
 
-              <InputField 
-                placeholder="you@mgit.ac.in" 
-                name="email" 
-                type="email" 
-                value={formData.email} 
-                onChange={handleChange} 
+              <InputField
+                placeholder="you@mgit.ac.in"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
               />
 
               <InputField
@@ -269,26 +274,26 @@ function AuthForm() {
               />
 
               {message && (
-                <div className={`text-center text-base font-medium mt-2 ${message.toLowerCase().includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-center text-base font-medium mt-2 ${message.toLowerCase().includes('success') ? 'text-emerald-600' : 'text-red-600'}`}>
                   {message}
                 </div>
               )}
 
               {isSignIn && (
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <label className="flex items-center gap-2 text-gray-700">
-                    <input type="checkbox" className="h-4 w-4 rounded border-gray-300" />
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm mt-2">
+                  <label className="flex items-center gap-2 text-slate-700">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-200 accent-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500" />
                     Remember me
                   </label>
-                  <span className="text-blue-600 hover:underline cursor-pointer font-semibold" onClick={() => setShowReset(true)}>
+                  <button type="button" className="text-indigo-700 hover:underline font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5" onClick={() => setShowReset(true)}>
                     Forgot password?
-                  </span>
+                  </button>
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
               >
                 {isSignIn ? 'Sign In' : 'Create Account'}
               </button>
@@ -296,8 +301,8 @@ function AuthForm() {
           )}
 
           {showReset && (
-            <div className="mt-10 p-6 bg-gray-50 rounded-2xl shadow-lg border border-gray-200">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">
+            <div className="mt-10 p-6 bg-slate-50 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="text-xl font-bold text-slate-900 mb-4 text-center">
                 {resetStep === 'email' ? 'Reset Password' : 'Verify OTP'}
               </h3>
               <form onSubmit={handleResetSubmit} className="space-y-4">
@@ -330,7 +335,7 @@ function AuthForm() {
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
                 >
                   {resetStep === 'email' ? 'Send OTP' : 'Reset Password'}
                 </button>
@@ -342,11 +347,11 @@ function AuthForm() {
             </div>
           )}
 
-          <p className="text-base text-center text-gray-600 mt-8">
+          <p className="text-base text-center text-slate-600 mt-8">
             {isSignIn ? "Don't have an account?" : "Already have an account?"}{' '}
-            <span className="text-blue-600 cursor-pointer hover:underline font-semibold" onClick={toggleForm}>
+            <button type="button" className="text-indigo-700 hover:underline font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5" onClick={toggleForm}>
               {isSignIn ? 'Sign Up' : 'Sign In'}
-            </span>
+            </button>
           </p>
         </div>
       </div>
@@ -362,17 +367,20 @@ function InputField({ placeholder, type, name, value, onChange, rightIcon, onRig
         name={name}
         value={value}
         onChange={onChange}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 focus:outline-none min-w-0 bg-white text-slate-900 placeholder:text-slate-500"
+        aria-label={placeholder}
         placeholder={placeholder}
         required
       />
       {rightIcon && (
-        <div
-          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 cursor-pointer"
+        <button
+          type="button"
+          aria-label={type === 'password' ? 'Show password' : 'Hide password'}
+          className="absolute inset-y-1 right-1 px-3 flex items-center rounded-xl text-slate-500 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors py-1.5"
           onClick={onRightIconClick}
         >
           {rightIcon}
-        </div>
+        </button>
       )}
     </div>
   );

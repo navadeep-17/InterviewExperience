@@ -9,18 +9,19 @@ import { apiRequest } from '../services/apiClient';
 // Helper components
 const Input = ({ label, ...props }) => (
   <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
     <input
       {...props}
-      className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-400"
+      aria-label={label}
+      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-4 focus:border-indigo-500 focus:ring-indigo-100 min-w-0 bg-white text-slate-900 placeholder:text-slate-500"
     />
   </div>
 );
 
 const ProfileDetail = ({ label, value }) => (
-  <div>
-    <span className="font-semibold">{label}:</span>{" "}
-    {value ? value : <span className="text-gray-400">Not set</span>}
+  <div className="min-w-0 break-words text-slate-900 text-sm">
+    <span className="block text-xs font-semibold text-slate-500 mb-1">{label}:</span>{" "}
+    {value ? value : <span className="text-slate-500">Not set</span>}
   </div>
 );
 
@@ -131,53 +132,53 @@ const ProfilePage = () => {
     setIsEditing(true);
   };
 
-  if (loading) return <div className="text-center mt-10">Loading...</div>;
+  if (loading) return <div className="text-center py-10 text-slate-500">Loading...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-0 sm:p-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-white rounded-2xl shadow-lg">
+    <div className="max-w-3xl mx-auto py-6 sm:py-10 px-4 sm:px-6 bg-slate-50">
       {/* Go to Home Button */}
       <div className="flex justify-start mb-4">
         <button
           onClick={() => navigate("/home")}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md shadow hover:bg-blue-700 transition"
+          className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
         >
           Go to Home
         </button>
       </div>
       {/* Profile Header */}
-      <div className="flex items-center mb-8 p-6 rounded-t-2xl bg-gradient-to-r from-blue-600 to-indigo-500 shadow">
-        <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gray-300 overflow-hidden flex items-center justify-center transition-transform hover:scale-105">
+      <div className="relative flex flex-wrap items-center gap-4 mb-6 p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-indigo-50 bg-indigo-100 overflow-hidden flex items-center justify-center">
           {userData.avatar ? (
             <img src={userData.avatar} alt="User Avatar" className="w-full h-full object-cover" />
           ) : (
-            <User className="w-16 h-16 text-gray-400" />
+            <User className="w-16 h-16 text-slate-500" />
           )}
         </div>
-        <div className="ml-8 flex-1">
-          <h1 className="text-3xl font-bold text-white drop-shadow">{userData.name || "Your Name"}</h1>
-          <p className="text-indigo-100">{userData.department || "Department"}</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 break-words">{userData.name || "Your Name"}</h1>
+          <p className="text-slate-600">{userData.department || "Department"}</p>
         </div>
         <button
           onClick={() => setIsEditing((edit) => !edit)}
-          className="p-2 rounded-lg text-white bg-blue-500 hover:bg-blue-700 transition"
-          title="Edit Profile"
+          className="shrink-0 p-3 rounded-xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
+          title="Edit Profile" aria-label="Edit profile"
         >
           <Edit className="w-5 h-5" />
         </button>
       </div>
 
       {/* Suggestion Box */}
-      <div className="mb-6 mx-4 p-4 bg-blue-100 border-l-4 border-blue-400 rounded shadow-sm text-blue-800">
+      <div className="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-700 text-sm leading-relaxed">
         <strong>Tip:</strong> Keep your profile updated and share detailed interview experiences to help others!
       </div>
 
       {/* Edit/Profile Details */}
-      <div className="mx-4 mb-8">
-        {msg && <div className="text-green-600 mb-2">{msg}</div>}
+      <div className="mb-6">
+        {msg && <div className="text-emerald-600 mb-2">{msg}</div>}
         {error && <div className="text-red-600 mb-2">{error}</div>}
 
         {isEditing ? (
-          <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-xl shadow p-6">
+          <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6">
             <Input label="Name" name="name" value={formData.name || ""} onChange={handleInputChange} />
             <Input label="Department" name="department" value={formData.department || ""} onChange={handleInputChange} />
             <Input label="Graduation Year" name="graduationYear" value={formData.graduationYear || ""} onChange={handleInputChange} />
@@ -186,14 +187,16 @@ const ProfilePage = () => {
             <Input label="Currently Studying" name="currentlyStudying" value={formData.currentlyStudying || ""} onChange={handleInputChange} />
             <Input label="Phone Number" name="phoneNumber" value={formData.phoneNumber || ""} onChange={handleInputChange} />
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Choose an Avatar</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Choose an Avatar</label>
               <div className="flex gap-3 flex-wrap">
                 {avatarOptions.map((url) => (
                   <button
                     type="button"
                     key={url}
-                    className={`rounded-full border-2 p-1 transition hover:scale-110 ${
-                      formData.avatar === url ? "border-blue-500 ring-2 ring-blue-300" : "border-transparent"
+                    aria-label="Select avatar"
+                    aria-pressed={formData.avatar === url}
+                    className={`focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-full border-2 p-1 transition  ${
+                      formData.avatar === url ? "border-indigo-500 ring-2 ring-indigo-300" : "border-transparent"
                     }`}
                     onClick={() => setFormData((prev) => ({ ...prev, avatar: url }))}
                   >
@@ -202,17 +205,17 @@ const ProfilePage = () => {
                 ))}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 shadow"
+                className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 flex items-center gap-2 shadow-sm focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
                 disabled={submitting}
               >
                 <Save className="w-4 h-4" /> Save Changes
               </button>
               <button
                 type="button"
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 flex items-center gap-2"
+                className="bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl hover:bg-slate-300 flex items-center gap-2 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
                 onClick={() => {
                   setIsEditing(false);
                   setFormData(userData); // Reset changes
@@ -226,7 +229,7 @@ const ProfilePage = () => {
             </div>
           </form>
         ) : (
-          <div className="space-y-2 bg-white rounded-xl shadow p-6">
+          <div className="grid gap-5 sm:grid-cols-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
             <ProfileDetail label="Roll Number" value={userData.rollNumber} />
             <ProfileDetail label="Department" value={userData.department} />
             <ProfileDetail label="Graduation Year" value={userData.graduationYear} />
@@ -240,25 +243,25 @@ const ProfilePage = () => {
       <hr className="my-8" />
 
       {/* User Posts Section */}
-      <div className="mx-4">
-        <h2 className="text-xl font-bold mb-4 text-blue-700">Your Posts</h2>
+      <div className="min-w-0">
+        <h2 className="text-xl font-bold mb-5 pr-10 text-slate-900">Your Posts</h2>
         <ProfileExperienceFeed data={data} mode="own" viewer={userData} onEditExperience={handleEditExperience} />
       </div>
 
       {/* Edit Experience Modal */}
       {isEditing && editFormData && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center z-50">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90dvh]">
             <button
               onClick={() => {
                 setIsEditing(false);
                 setEditFormData(null);
               }}
-              className="absolute top-4 right-4 text-gray-500"
+              aria-label="Close experience editor" className="absolute top-3 right-3 p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
             >
               <XCircle className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-bold mb-4 text-blue-700">Edit Your Interview Experience</h2>
+            <h2 className="text-xl font-bold mb-5 pr-10 text-slate-900">Edit Your Interview Experience</h2>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -269,30 +272,30 @@ const ProfilePage = () => {
               }}
               className="space-y-4"
             >
-              <input
+              <input aria-label="Company"
                 type="text"
                 name="company"
                 placeholder="Company"
                 value={editFormData.company}
                 onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 required
               />
-              <input
+              <input aria-label="Role"
                 type="text"
                 name="role"
                 placeholder="Role"
                 value={editFormData.role}
                 onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 required
               />
               {/* Department field removed */}
-              <select
+              <select aria-label="difficulty"
                 name="difficulty"
                 value={editFormData.difficulty}
                 onChange={(e) => setEditFormData({ ...editFormData, difficulty: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 required
               >
                 <option value="">Select Difficulty</option>
@@ -300,37 +303,37 @@ const ProfilePage = () => {
                 <option value="Medium">Medium</option>
                 <option value="Hard">Hard</option>
               </select>
-              <input
+              <input aria-label="roundDate"
                 type="date"
                 name="roundDate"
                 value={editFormData.roundDate ? new Date(editFormData.roundDate).toISOString().slice(0, 10) : "" }
                 onChange={(e) => setEditFormData({ ...editFormData, roundDate: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 required
               />
-              <textarea
+              <textarea aria-label="Overall experience description..."
                 name="description"
                 placeholder="Overall experience description..."
                 value={editFormData.description}
                 onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 rows={3}
               />
-              <textarea
+              <textarea aria-label="Any tips for others..."
                 name="tips"
                 placeholder="Any tips for others..."
                 value={editFormData.tips}
                 onChange={(e) => setEditFormData({ ...editFormData, tips: e.target.value })}
-                className="w-full border px-4 py-2 rounded-md"
+                className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 rows={2}
               />
 
               {/* Edit Interview Rounds */}
               <div className="space-y-4">
-                <h4 className="font-semibold text-gray-700">Interview Rounds</h4>
+                <h4 className="font-semibold text-slate-700">Interview Rounds</h4>
                 {editFormData.rounds.map((round, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-2 bg-gray-50">
-                    <input
+                  <div key={index} className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+                    <input aria-label="Round Name"
                       type="text"
                       name="roundName"
                       placeholder="Round Name"
@@ -340,10 +343,10 @@ const ProfilePage = () => {
                         newRounds[index].roundName = e.target.value;
                         setEditFormData({ ...editFormData, rounds: newRounds });
                       }}
-                      className="w-full border px-4 py-2 rounded-md"
+                      className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                       required
                     />
-                    <textarea
+                    <textarea aria-label="Questions asked"
                       name="questions"
                       placeholder="Questions asked"
                       value={round.questions}
@@ -352,10 +355,10 @@ const ProfilePage = () => {
                         newRounds[index].questions = e.target.value;
                         setEditFormData({ ...editFormData, rounds: newRounds });
                       }}
-                      className="w-full border px-4 py-2 rounded-md"
+                      className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                       required
                     />
-                    <input
+                    <input aria-label="Duration"
                       type="text"
                       name="duration"
                       placeholder="Duration"
@@ -365,7 +368,7 @@ const ProfilePage = () => {
                         newRounds[index].duration = e.target.value;
                         setEditFormData({ ...editFormData, rounds: newRounds });
                       }}
-                      className="w-full border px-4 py-2 rounded-md"
+                      className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                     />
                     <button
                       type="button"
@@ -374,7 +377,7 @@ const ProfilePage = () => {
                         newRounds.splice(index, 1);
                         setEditFormData({ ...editFormData, rounds: newRounds });
                       }}
-                      className="text-red-500 text-sm underline"
+                      className="text-red-500 text-sm underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                     >
                       Remove Round
                     </button>
@@ -387,7 +390,7 @@ const ProfilePage = () => {
                   const newRounds = [...editFormData.rounds, { roundName: '', questions: '', duration: '' }];
                   setEditFormData({ ...editFormData, rounds: newRounds });
                 }}
-                className="text-blue-600 text-sm underline mt-2"
+                className="text-indigo-600 text-sm underline mt-2 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
               >
                 + Add Another Round
               </button>
@@ -396,7 +399,7 @@ const ProfilePage = () => {
               <div className="flex justify-center mt-6">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+                  className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
                 >
                   Update Experience
                 </button>
