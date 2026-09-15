@@ -41,19 +41,19 @@ const MessageComponent = () => {
 
   if (!currentUser || !currentUser._id) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
+      <div className="flex items-center justify-center h-screen text-slate-500">
         Please log in to view your messages.
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 text-gray-800">
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-slate-50 text-slate-900 overflow-hidden">
       {/* Mobile Top Bar */}
-      <div className="flex md:hidden items-center justify-between bg-gradient-to-r from-blue-600 to-blue-400 text-white px-4 py-3 shadow z-20">
+      <div className="flex shrink-0 md:hidden items-center justify-between bg-white border-b border-slate-200 text-indigo-700 px-4 py-2 z-20">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded focus:outline-none focus:ring-2 focus:ring-white"
+          className="p-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
           aria-label="Open sidebar"
         >
           <MessageSquare className="w-7 h-7" />
@@ -70,21 +70,21 @@ const MessageComponent = () => {
       {/* Backdrop for mobile sidebar */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 z-20 md:hidden"
+          className="fixed inset-0 bg-slate-900/30 z-20 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Chat Window */}
-      <main className="flex-1 flex flex-col bg-white rounded-tl-3xl shadow-lg overflow-hidden h-[100dvh] md:h-auto">
+      <main className="flex-1 min-w-0 min-h-0 flex flex-col bg-white overflow-hidden">
         {/* Desktop Chat Header */}
-        <div className="hidden md:flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-100 to-blue-50 shadow-sm">
+        <div className="hidden md:flex shrink-0 items-center justify-between p-5 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-4">
             {selectedUser && (
               <ChatAvatar user={selectedUser} size={44} />
             )}
             <h3
-              className={`text-xl font-bold text-blue-700 cursor-pointer hover:underline`}
+              className={`text-xl font-bold text-indigo-700 cursor-pointer hover:underline`}
               onClick={() => {
                 if (selectedUser) navigate(`/user/${selectedUser._id}`);
               }}
@@ -100,12 +100,12 @@ const MessageComponent = () => {
           </div>
         </div>
         {/* Mobile Chat Header */}
-        <div className="flex md:hidden items-center gap-3 p-4 border-b bg-gradient-to-r from-blue-100 to-blue-50 shadow-sm">
+        <div className="flex shrink-0 md:hidden items-center gap-3 p-4 border-b border-slate-200 bg-slate-50">
           {selectedUser && (
             <ChatAvatar user={selectedUser} size={36} />
           )}
           <h3
-            className="text-base font-bold text-blue-700 truncate cursor-pointer hover:underline"
+            className="text-base font-bold text-indigo-700 truncate cursor-pointer hover:underline"
             onClick={() => {
               if (selectedUser) navigate(`/user/${selectedUser._id}`);
             }}

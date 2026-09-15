@@ -34,24 +34,24 @@ const CommentThread = ({
         key={comment._id}
         style={{
           marginLeft: level === 0 ? 0 : 8,
-          borderLeft: level > 0 ? '2px solid #60a5fa' : 'none',
+          borderLeft: level > 0 ? '2px solid #c7d2fe' : 'none',
           background: isHighlighted
-            ? '#fef9c3'
+            ? '#fef3c7'
             : level > 0
-            ? '#f9fafb'
+            ? '#f8fafc'
             : '#fff',
           paddingLeft: level > 0 ? 8 : 0,
           marginTop: 8,
-          borderRadius: 8,
-          boxShadow: level === 0 ? '0 1px 6px rgba(0,0,0,0.03)' : 'none',
+          borderRadius: 12,
+          boxShadow: level === 0 ? '0 1px 2px rgba(15,23,42,0.04)' : 'none',
           fontSize: level > 0 ? '0.96em' : '1em',
           paddingTop: 8,
           paddingBottom: 8,
           transition: 'background 0.5s'
         }}
-        className={`flex items-start gap-2 border border-gray-100 hover:shadow-md transition group ${isHighlighted ? 'ring-2 ring-yellow-300' : ''} sm:gap-3`}
+        className={`flex items-start gap-2 border border-slate-200 px-2 transition group ${isHighlighted ? 'ring-2 ring-amber-300' : ''} sm:gap-3`}
       >
-        <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-base overflow-hidden shadow-sm border border-blue-200">
+        <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-base overflow-hidden shadow-sm border border-slate-200">
           {comment.user?.avatar ? (
             <img src={comment.user.avatar} alt="avatar" className="w-full h-full object-cover rounded-full" />
           ) : (
@@ -62,23 +62,23 @@ const CommentThread = ({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1">
-            <span className="font-semibold text-gray-900 truncate max-w-[90px] sm:max-w-[160px]">{comment.user?.name || "Someone"}</span>
-            <span className="text-xs text-gray-400 whitespace-nowrap">
+            <span className="font-semibold text-slate-900 truncate max-w-[90px] sm:max-w-[160px]">{comment.user?.name || "Someone"}</span>
+            <span className="text-xs text-slate-500 whitespace-nowrap">
               {comment.createdAt ? dayjs(comment.createdAt).fromNow() : ""}
             </span>
             {user && comment.user?._id === user._id && (
-              <span className="ml-2 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+              <span className="flex flex-wrap gap-2 sm:ml-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition">
                 {editingCommentId === comment._id ? (
                   <>
                     <button
-                      className="text-xs text-green-600 hover:underline focus:underline"
+                      className="text-xs text-indigo-700 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                       onClick={() => handleEditCommentSave(expId, comment._id)}
                       title="Save"
                     >
                       Save
                     </button>
                     <button
-                      className="text-xs text-gray-500 hover:underline focus:underline"
+                      className="text-xs text-slate-500 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                       onClick={() => setEditingCommentId(null)}
                       title="Cancel"
                     >
@@ -88,14 +88,14 @@ const CommentThread = ({
                 ) : (
                   <>
                     <button
-                      className="text-xs text-blue-600 hover:underline focus:underline"
+                      className="text-xs text-indigo-600 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                       onClick={() => handleEditComment(comment._id, comment.text)}
                       title="Edit"
                     >
                       Edit
                     </button>
                     <button
-                      className="text-xs text-red-500 hover:underline focus:underline"
+                      className="text-xs text-red-500 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                       onClick={() => handleDeleteComment(expId, comment._id)}
                       title="Delete"
                     >
@@ -108,17 +108,17 @@ const CommentThread = ({
           </div>
           {/* Replying to label */}
           {level > 0 && comment.parentName && (
-            <div className="text-xs text-blue-400 mb-1">
+            <div className="text-xs text-indigo-700 mb-1">
               Replying to {comment.parentName}
             </div>
           )}
-          <div className="text-gray-800 text-sm break-words">
+          <div className="text-slate-900 text-sm break-words">
             {editingCommentId === comment._id ? (
               <input
                 type="text"
-                value={editingCommentText}
+                aria-label="Edit comment" value={editingCommentText}
                 onChange={e => setEditingCommentText(e.target.value)}
-                className="border px-2 py-1 rounded w-full text-sm focus:ring-2 focus:ring-blue-200"
+                className="border px-2 py-2.5 rounded-xl w-full text-sm focus:ring-4 focus:ring-indigo-100 focus:outline-none focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleEditCommentSave(expId, comment._id);
                   if (e.key === 'Escape') setEditingCommentId(null);
@@ -132,20 +132,20 @@ const CommentThread = ({
           {/* Reply Button and Input */}
           <div className="flex flex-wrap items-center gap-2 mt-1">
             {level + 1 < MAX_NESTING && <button
-              className="text-xs text-blue-500 hover:underline focus:underline"
+              className="text-xs text-indigo-700 hover:underline focus:underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
               onClick={() => setReplyingTo(comment._id)}
             >
               Reply
             </button>}
             {level + 1 < MAX_NESTING && replyingTo === comment._id && (
               <div className="flex items-center gap-2 mt-2 w-full">
-                <input
+                <input aria-label="Write a reply..."
                   type="text"
                   value={replyInputs[comment._id] || ""}
                   onChange={e =>
                     setReplyInputs({ ...replyInputs, [comment._id]: e.target.value })
                   }
-                  className="flex-1 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-blue-200"
+                  className="flex-1 min-w-0 px-2 py-2.5 border rounded-xl text-sm focus:ring-4 focus:ring-indigo-100 focus:outline-none focus:border-indigo-500 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                   placeholder="Write a reply..."
                   onKeyDown={e => {
                     if (e.key === 'Enter' && replyInputs[comment._id]?.trim()) {
@@ -154,7 +154,7 @@ const CommentThread = ({
                   }}
                 />
                 <button
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-semibold shadow hover:bg-blue-700 transition disabled:opacity-60"
+                  className="bg-indigo-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold shadow-sm hover:bg-indigo-700 transition disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-indigo-100 transition-colors"
                   onClick={() =>
                     handlePostComment(expId, replyInputs[comment._id], comment._id)
                   }
@@ -167,7 +167,7 @@ const CommentThread = ({
             {/* Collapse/Expand Replies Button */}
             {hasReplies && (
               <button
-                className="text-xs text-gray-500 hover:underline focus:underline ml-2"
+                className="text-xs text-slate-500 hover:underline focus:underline ml-2 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                 onClick={() =>
                   setCollapsedComments(prev => ({
                     ...prev,
@@ -206,7 +206,7 @@ const CommentThread = ({
           }
           {/* If max depth reached, show a message */}
           {hasReplies && !isCollapsed && level + 1 === MAX_NESTING && (
-            <div className="text-xs text-gray-400 mt-2 ml-2">
+            <div className="text-xs text-slate-500 mt-2 ml-2">
               Further replies are hidden to keep the thread readable.
             </div>
           )}

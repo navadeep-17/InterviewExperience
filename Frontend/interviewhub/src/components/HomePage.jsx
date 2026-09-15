@@ -66,31 +66,31 @@ const HomePage = () => {
 
   // --- UI ---
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-white flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
-      <aside className={`bg-blue-800 text-white ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 flex flex-col`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 text-slate-600 ${sidebarOpen ? 'translate-x-0 md:w-64' : '-translate-x-full invisible md:visible md:translate-x-0 md:w-20'} transition-all duration-300 flex flex-col md:sticky md:top-0 md:h-screen md:shrink-0`}>
         <div className="p-4 flex items-center justify-between">
-          {sidebarOpen && <h2 className="text-xl font-bold">RoundRelay</h2>}
-          <button onClick={toggleSidebar} className="p-2 rounded-lg hover:bg-blue-700">
+          {sidebarOpen && <h2 className="text-xl font-bold text-indigo-700">RoundRelay</h2>}
+          <button onClick={toggleSidebar} aria-label="Toggle navigation" className="p-2.5 rounded-xl hover:bg-indigo-50 text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
         <nav className="flex-1 mt-6">
           <ul className="space-y-2 px-2">
             <li>
-              <Link to="/home" className="flex items-center space-x-3 p-3 rounded-lg bg-blue-700 hover:bg-blue-600">
+              <Link to="/home" aria-label="Dashboard" className="flex items-center space-x-3 p-3 rounded-xl bg-indigo-50 text-indigo-700 font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
                 <Home className="w-5 h-5" />
                 {sidebarOpen && <span>Dashboard</span>}
               </Link>
             </li>
             <li>
-              <Link to="/profile" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700">
+              <Link to="/profile" aria-label="Profile" className="flex items-center space-x-3 p-3 rounded-xl hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
                 <User className="w-5 h-5" />
                 {sidebarOpen && <span>Profile</span>}
               </Link>
             </li>
             <li>
-              <Link to="/message" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700">
+              <Link to="/message" aria-label="Messages" className="flex items-center space-x-3 p-3 rounded-xl hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
                 <MessageCircle className="w-5 h-5" />
                 {sidebarOpen && <span>Messages</span>}
               </Link>
@@ -99,7 +99,8 @@ const HomePage = () => {
             <li>
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 cursor-pointer w-full text-left"
+                aria-label="Logout"
+                className="flex items-center space-x-3 p-3 rounded-xl hover:bg-slate-100 cursor-pointer w-full text-left focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
               >
                 <LogOut className="w-5 h-5" />
                 {sidebarOpen && <span>Logout</span>}
@@ -110,22 +111,27 @@ const HomePage = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <header className="flex items-center justify-between bg-white p-4 shadow rounded-xl">
-          <h1 className="text-2xl font-bold text-blue-700">Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="font-semibold">
+      <div className="flex-1 min-w-0">
+        <header className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 sm:px-6 py-4 border-b border-slate-200">
+          <div className="flex items-center gap-2">
+            <button onClick={toggleSidebar} aria-label="Open navigation" className="md:hidden p-2.5 rounded-xl text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
+          </div>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="text-right min-w-0">
+              <p className="font-semibold break-words">
                 Welcome, {user?.name || "User"}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-slate-500">
                 {user?.department || ""}{user?.graduationYear ? `, ${user.graduationYear}` : ""}
               </p>
             </div>
-            <div className="relative w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-              <img src={user?.avatar || "https://github.com/shadcn.png"} alt="user" className="w-full h-full object-cover" />
+            <div className="relative shrink-0 w-10 h-10 rounded-full bg-indigo-100 overflow-hidden">
+              {user?.avatar && <img src={user.avatar} alt="user" className="w-full h-full object-cover" />}
               {!user?.avatar && (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-600 font-medium">
+                <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-semibold">
                   {user?.name ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2) : "U"}
                 </div>
               )}
@@ -133,14 +139,14 @@ const HomePage = () => {
           </div>
         </header>
 
-        <div className="p-4 md:p-6">
+        <div className="max-w-6xl mx-auto p-4 md:p-6 pb-28">
           <ExperienceFilters sortOrder={data.sortOrder} onFiltersChange={data.setFilters}
             onSearch={data.search} onSortChange={data.setSortOrder} />
           <ExperienceFeed data={data} user={user} onEditExperience={setEditExperience} />
 
           {/* Floating CTA */}
-          <div className="fixed bottom-6 right-6">
-            <button onClick={() => setShowForm(true)} className="bg-blue-600 text-white rounded-full px-6 py-3 shadow-xl hover:bg-blue-700">
+          <div className="fixed bottom-5 right-4 sm:right-6 z-20">
+            <button onClick={() => setShowForm(true)} className="bg-indigo-600 text-white rounded-xl px-5 py-3 shadow-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
               + Share Your Experience
             </button>
           </div>
@@ -164,7 +170,7 @@ const HomePage = () => {
         <div className="text-center mt-4">
           <button
             onClick={data.loadMore}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
           >
             Load More
           </button>

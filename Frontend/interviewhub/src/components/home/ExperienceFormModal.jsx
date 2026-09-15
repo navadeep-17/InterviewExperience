@@ -31,36 +31,36 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90vh]">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center z-50">
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl relative overflow-y-auto max-h-[90dvh]">
+        <button onClick={onClose} aria-label="Close experience editor" className="absolute top-3 right-3 p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors">
           <X className="w-5 h-5" />
         </button>
-        <h2 className="text-xl font-bold mb-4 text-blue-700">{mode === 'edit' ? 'Edit Your Interview Experience' : 'Share Your Interview Experience'}</h2>
+        <h2 className="text-xl font-bold mb-5 pr-10 text-slate-900">{mode === 'edit' ? 'Edit Your Interview Experience' : 'Share Your Interview Experience'}</h2>
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          <input
+          <input aria-label="Company"
             type="text"
             name="company"
             placeholder="Company"
             value={formData.company}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             required
           />
-          <input
+          <input aria-label="Role"
             type="text"
             name="role"
             placeholder="Role"
             value={formData.role}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             required
           />
-          <select
+          <select aria-label="difficulty"
             name="difficulty"
             value={formData.difficulty}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             required
           >
             <option value="">Select Difficulty</option>
@@ -69,63 +69,63 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
             <option value="Hard">Hard</option>
           </select>
 
-          <input
+          <input aria-label="roundDate"
             type="date"
             name="roundDate"
             value={mode === 'edit' ? (formData.roundDate ? new Date(formData.roundDate).toISOString().slice(0, 10) : '') : formData.roundDate}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             required
           />
-          <textarea
+          <textarea aria-label="Overall experience description..."
             name="description"
             placeholder="Overall experience description..."
             value={formData.description}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             rows={3}
             required={mode === 'create'}
           />
 
           {/* Tips */}
-          <textarea
+          <textarea aria-label="Any tips for others..."
             name="tips"
             placeholder="Any tips for others..."
             value={formData.tips}
             onChange={handleFormChange}
-            className="w-full border px-4 py-2 rounded-md"
+            className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
             rows={2}
           />
 
           {/* Rounds */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-gray-700">Interview Rounds</h4>
+            <h4 className="font-semibold text-slate-700">Interview Rounds</h4>
             {formData.rounds.map((round, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-2 bg-gray-50">
-                <input
+              <div key={index} className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+                <input aria-label="Round Name"
                   type="text"
                   name="roundName"
                   placeholder="Round Name"
                   value={round.roundName}
                   onChange={(e) => handleFormChange(e, index)}
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                   required
                 />
-                <textarea
+                <textarea aria-label="Questions asked"
                   name="questions"
                   placeholder="Questions asked"
                   value={round.questions}
                   onChange={(e) => handleFormChange(e, index)}
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                   required
                 />
-                <input
+                <input aria-label="Duration"
                   type="text"
                   name="duration"
                   placeholder="Duration"
                   value={round.duration}
                   onChange={(e) => handleFormChange(e, index)}
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 min-w-0 border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
                 />
                 <button
                   type="button"
@@ -134,12 +134,12 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
                     newRounds.splice(index, 1);
                     setFormData({ ...formData, rounds: newRounds });
                   }}
-                  className="text-red-500 text-sm underline"
+                  className="text-red-500 text-sm underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
                 >
                   Remove Round
                 </button>
                 {mode === 'edit' && (
-                  <button type="button" onClick={addRound} className="text-blue-600 text-sm underline">
+                  <button type="button" onClick={addRound} className="text-indigo-600 text-sm underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5">
                     + Add Round
                   </button>
                 )}
@@ -155,7 +155,7 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
                     rounds: [...formData.rounds, { roundName: '', questions: '', duration: '' }],
                   })
                 }
-                className="text-blue-600 font-medium text-sm underline"
+                className="text-indigo-600 font-medium text-sm underline focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors rounded-xl py-1.5"
               >
                 + Add Another Round
               </button>
@@ -164,7 +164,7 @@ export default function ExperienceFormModal({ mode, experience, open = true, onS
 
           <button
             type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+            className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
           >
             {mode === 'edit' ? 'Update Experience' : 'Submit'}
           </button>
