@@ -67,7 +67,17 @@ GitHub Actions runs on pushes to `main` and pull requests targeting `main`. Back
 
 ## Production deployment
 
-Planned architecture: **Vercel frontend**, **Railway backend + Socket.IO**, and **MongoDB Atlas database**. These are preparation settings for `navadeep-17/InterviewExperience`; live deployment and provider acceptance remain unverified and user/reviewer-controlled.
+Production architecture: **Vercel frontend**, **Railway backend + Socket.IO**, and **MongoDB Atlas database**.
+
+Live production endpoints:
+
+- Frontend: [RoundRelay production](https://RoundRelay.vercel.app)
+- Backend: [RoundRelay backend](https://RoundRelay-backend-production.up.railway.app)
+- Backend readiness: [RoundRelay health](https://RoundRelay-backend-production.up.railway.app/health)
+
+DNS hostnames are case-insensitive for navigation. For environment variables such as `FRONTEND_URL` and `VITE_API_URL`, copy the provider-issued origin directly from the Vercel or Railway dashboard rather than retyping it.
+
+Provider deployment acceptance has been verified on the current production configuration: the Vercel deployment reports success for the reviewed `main` commit, and Railway reports a successful deployment with MongoDB connected and `/health` passing. End-user authenticated flows such as real registration/OTP/login should still be smoke-tested after production-affecting changes.
 
 ### Vercel project settings
 
@@ -80,9 +90,9 @@ Planned architecture: **Vercel frontend**, **Railway backend + Socket.IO**, and 
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 | Production Branch | `main` |
-| Production environment variable | `VITE_API_URL=https://<railway-backend-domain>` |
+| Production environment variable | `VITE_API_URL=<Railway production origin>` |
 
-Configure build settings in the Vercel dashboard. [Frontend/interviewhub/vercel.json](Frontend/interviewhub/vercel.json) contains only the SPA fallback: `/(.*)` to `/index.html`. This lets React Router handle direct navigation to `/login`, `/home`, `/profile`, `/message`, and `/user/:id`. Local Vite preview tests do not prove Vercel routing acceptance. See [Vercel's Vite SPA guidance](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas).
+Configure build settings in the Vercel dashboard. [Frontend/interviewhub/vercel.json](Frontend/interviewhub/vercel.json) contains only the SPA fallback: `/(.*)` to `/index.html`. This lets React Router handle direct navigation to `/login`, `/home`, `/profile`, `/message`, and `/user/:id`. See [Vercel's Vite SPA guidance](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas).
 
 `VITE_API_URL` must be the Railway HTTPS backend **origin only**, with no `/api` suffix or other path. The frontend appends `/api/...` for HTTP requests and uses the same origin for Socket.IO. There is no Vercel API proxy or separate socket URL variable.
 
@@ -92,11 +102,14 @@ Configure build settings in the Vercel dashboard. [Frontend/interviewhub/vercel.
 | --- | --- |
 | Repository | `navadeep-17/InterviewExperience` |
 | Root Directory | `/Backend` |
-| Builder | Railpack / Railway default Node detection |
+| Builder | Railpack |
+| Node runtime | `20.20.2` via `RAILPACK_NODE_VERSION` |
 | Build Command | Leave automatic/default |
 | Start Command | `npm start` |
 | Healthcheck Path | `/health` |
-| Public Networking | Generate a Railway HTTPS domain under Settings → Networking |
+| Public Networking | `RoundRelay-backend-production.up.railway.app` |
+
+Railpack resolves Node versions in priority order and gives `RAILPACK_NODE_VERSION` highest priority. The production service is pinned to `20.20.2` so Railway matches the Node 20 runtime used by CI. See [Railpack's Node.js version resolution](https://railpack.com/languages/node#versions).
 
 Do **not** manually set `PORT` for normal Railway deployment: Railway injects it, and the backend already reads `process.env.PORT || 5000`. The 5000 fallback applies when PORT is absent; local `.env.example` guidance remains unchanged. Configure `/health` so Railway waits for a 2xx response before activating a deployment. It returns 200 when MongoDB is ready and 503 otherwise. This deployment check is not continuous monitoring. See [Railway healthchecks and PORT](https://docs.railway.com/deployments/healthchecks).
 
@@ -108,13 +121,16 @@ Set these Railway production variables through the provider's variable settings,
 | `JWT_SECRET` | Private authentication signing secret |
 | `EMAIL_USER` | Private email account configuration |
 | `EMAIL_PASS` | Private email app password |
-| `FRONTEND_URL` | `https://<vercel-production-domain>`: exact final production origin, without `/login`, `/home`, `/api`, or any other path |
+| `FRONTEND_URL` | Exact Vercel production origin copied from the provider dashboard |
 | `ALLOWED_EMAIL_DOMAINS` | `mgit.ac.in` |
+| `RAILPACK_NODE_VERSION` | `20.20.2` |
+
+`RAILPACK_NODE_VERSION` and `ALLOWED_EMAIL_DOMAINS` are non-secret configuration values. Keep the other credential-bearing values private in the provider dashboard.
 
 ### URL handoff and preview limitation
 
-1. Once Railway provides the backend's public HTTPS URL, set that origin as Vercel's production `VITE_API_URL`.
-2. Once the final Vercel production URL is known, set that origin as Railway's `FRONTEND_URL`.
+1. Copy Railway's production backend origin from its Networking settings into Vercel production as `VITE_API_URL`.
+2. Copy Vercel's production frontend origin from its Domains/production deployment into Railway as `FRONTEND_URL`.
 3. Rebuild/redeploy the Vercel frontend after changing `VITE_API_URL`: [Vite variables are build-time values](https://vite.dev/guide/env-and-mode). Restart/redeploy the Railway backend after changing its runtime variables as appropriate.
 
 Production is the initial supported target. The backend currently allows one configured `FRONTEND_URL` origin, so arbitrary Vercel Preview origins are not automatically authorized for backend HTTP/Socket.IO access. Controlled preview-origin support would require a future explicit CORS policy; the current policy is unchanged.
