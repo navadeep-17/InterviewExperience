@@ -71,9 +71,11 @@ Production architecture: **Vercel frontend**, **Railway backend + Socket.IO**, a
 
 Live production endpoints:
 
-- Frontend: `https://roundrelay.vercel.app`
-- Backend: `https://roundrelay-backend-production.up.railway.app`
-- Backend readiness: `https://roundrelay-backend-production.up.railway.app/health`
+- Frontend: [RoundRelay production](https://RoundRelay.vercel.app)
+- Backend: [RoundRelay backend](https://RoundRelay-backend-production.up.railway.app)
+- Backend readiness: [RoundRelay health](https://RoundRelay-backend-production.up.railway.app/health)
+
+DNS hostnames are case-insensitive for navigation. For environment variables such as `FRONTEND_URL` and `VITE_API_URL`, copy the provider-issued origin directly from the Vercel or Railway dashboard rather than retyping it.
 
 Provider deployment acceptance has been verified on the current production configuration: the Vercel deployment reports success for the reviewed `main` commit, and Railway reports a successful deployment with MongoDB connected and `/health` passing. End-user authenticated flows such as real registration/OTP/login should still be smoke-tested after production-affecting changes.
 
@@ -88,7 +90,7 @@ Provider deployment acceptance has been verified on the current production confi
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 | Production Branch | `main` |
-| Production environment variable | `VITE_API_URL=https://roundrelay-backend-production.up.railway.app` |
+| Production environment variable | `VITE_API_URL=<Railway production origin>` |
 
 Configure build settings in the Vercel dashboard. [Frontend/interviewhub/vercel.json](Frontend/interviewhub/vercel.json) contains only the SPA fallback: `/(.*)` to `/index.html`. This lets React Router handle direct navigation to `/login`, `/home`, `/profile`, `/message`, and `/user/:id`. See [Vercel's Vite SPA guidance](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas).
 
@@ -105,7 +107,7 @@ Configure build settings in the Vercel dashboard. [Frontend/interviewhub/vercel.
 | Build Command | Leave automatic/default |
 | Start Command | `npm start` |
 | Healthcheck Path | `/health` |
-| Public Networking | `roundrelay-backend-production.up.railway.app` |
+| Public Networking | `RoundRelay-backend-production.up.railway.app` |
 
 Railpack resolves Node versions in priority order and gives `RAILPACK_NODE_VERSION` highest priority. The production service is pinned to `20.20.2` so Railway matches the Node 20 runtime used by CI. See [Railpack's Node.js version resolution](https://railpack.com/languages/node#versions).
 
@@ -119,7 +121,7 @@ Set these Railway production variables through the provider's variable settings,
 | `JWT_SECRET` | Private authentication signing secret |
 | `EMAIL_USER` | Private email account configuration |
 | `EMAIL_PASS` | Private email app password |
-| `FRONTEND_URL` | `https://roundrelay.vercel.app` |
+| `FRONTEND_URL` | Exact Vercel production origin copied from the provider dashboard |
 | `ALLOWED_EMAIL_DOMAINS` | `mgit.ac.in` |
 | `RAILPACK_NODE_VERSION` | `20.20.2` |
 
@@ -127,8 +129,8 @@ Set these Railway production variables through the provider's variable settings,
 
 ### URL handoff and preview limitation
 
-1. Railway's production backend origin is `https://roundrelay-backend-production.up.railway.app`; Vercel production uses that exact origin as `VITE_API_URL`.
-2. Vercel's production frontend origin is `https://roundrelay.vercel.app`; Railway uses that exact origin as `FRONTEND_URL`.
+1. Copy Railway's production backend origin from its Networking settings into Vercel production as `VITE_API_URL`.
+2. Copy Vercel's production frontend origin from its Domains/production deployment into Railway as `FRONTEND_URL`.
 3. Rebuild/redeploy the Vercel frontend after changing `VITE_API_URL`: [Vite variables are build-time values](https://vite.dev/guide/env-and-mode). Restart/redeploy the Railway backend after changing its runtime variables as appropriate.
 
 Production is the initial supported target. The backend currently allows one configured `FRONTEND_URL` origin, so arbitrary Vercel Preview origins are not automatically authorized for backend HTTP/Socket.IO access. Controlled preview-origin support would require a future explicit CORS policy; the current policy is unchanged.
