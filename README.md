@@ -25,12 +25,16 @@ Create your own untracked `Backend/.env` from `Backend/.env.example` and supply 
 ```text
 MONGO_URI
 JWT_SECRET
+RESEND_API_KEY
+EMAIL_FROM
 EMAIL_USER
 EMAIL_PASS
 FRONTEND_URL
 PORT
 ALLOWED_EMAIL_DOMAINS
 ```
+
+`RESEND_API_KEY` + `EMAIL_FROM` select the HTTPS transactional-email path used in production. `EMAIL_USER` + `EMAIL_PASS` remain an optional local Gmail/Nodemailer fallback when `RESEND_API_KEY` is absent.
 
 Run `npm start` or `npm run dev` from `Backend/`.
 
@@ -51,7 +55,7 @@ Run `npm run dev` from `Frontend/interviewhub/`. All frontend npm commands run i
 
 ## Verification
 
-From `Backend/`, run `npm test`. The isolated suite includes `tests/deploymentReadiness.test.js` and runs without a live database or email service. Current baseline: **413 tests, 413 passed, 0 failed, 0 skipped**. Repository-owned JavaScript syntax validation covers 25 backend files.
+From `Backend/`, run `npm test`. The isolated suite includes `tests/deploymentReadiness.test.js` and `tests/mailTransport.test.js` and runs without a live database or email service. Current baseline: **415 tests, 415 passed, 0 failed, 0 skipped**. Repository-owned JavaScript syntax validation covers **27 backend files**.
 
 From `Frontend/interviewhub/`, run:
 
@@ -67,7 +71,7 @@ GitHub Actions runs on pushes to `main` and pull requests targeting `main`. Back
 
 ## Production deployment
 
-Production architecture: **Vercel frontend**, **Railway backend + Socket.IO**, and **MongoDB Atlas database**.
+Production architecture: **Vercel frontend**, **Railway backend + Socket.IO**, **MongoDB Atlas database**, and **Resend HTTPS transactional email** for OTP delivery.
 
 Live production endpoints:
 
@@ -113,19 +117,21 @@ Railpack resolves Node versions in priority order and gives `RAILPACK_NODE_VERSI
 
 Do **not** manually set `PORT` for normal Railway deployment: Railway injects it, and the backend already reads `process.env.PORT || 5000`. The 5000 fallback applies when PORT is absent; local `.env.example` guidance remains unchanged. Configure `/health` so Railway waits for a 2xx response before activating a deployment. It returns 200 when MongoDB is ready and 503 otherwise. This deployment check is not continuous monitoring. See [Railway healthchecks and PORT](https://docs.railway.com/deployments/healthchecks).
 
+Production OTP delivery uses Resend's HTTPS API rather than SMTP. Keep the provider API key private, and configure `EMAIL_FROM` to a sender that Resend has verified for the account. The Gmail/Nodemailer variables are retained only for optional local fallback and are not required by the Railway production path when `RESEND_API_KEY` is configured.
+
 Set these Railway production variables through the provider's variable settings, supplying private values only there:
 
 | Variable | Production value/purpose |
 | --- | --- |
 | `MONGO_URI` | Private MongoDB Atlas connection URI |
 | `JWT_SECRET` | Private authentication signing secret |
-| `EMAIL_USER` | Private email account configuration |
-| `EMAIL_PASS` | Private email app password |
+| `RESEND_API_KEY` | Private Resend transactional-email API key |
+| `EMAIL_FROM` | Resend-verified sender identity used for OTP messages |
 | `FRONTEND_URL` | Exact Vercel production origin copied from the provider dashboard |
 | `ALLOWED_EMAIL_DOMAINS` | `mgit.ac.in` |
 | `RAILPACK_NODE_VERSION` | `20.20.2` |
 
-`RAILPACK_NODE_VERSION` and `ALLOWED_EMAIL_DOMAINS` are non-secret configuration values. Keep the other credential-bearing values private in the provider dashboard.
+`RAILPACK_NODE_VERSION`, `ALLOWED_EMAIL_DOMAINS`, and the public sender identity in `EMAIL_FROM` are non-secret configuration values. Keep credential-bearing values private in the provider dashboard.
 
 ### URL handoff and preview limitation
 
