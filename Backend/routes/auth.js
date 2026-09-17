@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { authMiddleware } = require('../middleware/authMiddleware');
-const nodemailer = require('nodemailer');
+const { createMailTransport } = require('../utils/mailTransport');
 const Group = require('../models/Group'); // Add at the top
 const {
   AUTH_USER_FIELDS, OWN_PROFILE_FIELDS, STUDENT_PROFILE_FIELDS,
@@ -30,6 +30,29 @@ const hasValidOtp = (user, otp) => (
   Date.now() <= new Date(user.otpExpiry).getTime()
 );
 
+const setFreshOtp = async (user) => {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.otp = otp;
+  user.otpExpiry = Date.now() + 5 * 60 * 1000;
+  await user.save();
+  return otp;
+};
+
+const sendRegistrationOtp = async ({ email, otp, context }) => {
+  const transporter = createMailTransport();
+  let messageText = `Your RoundRelay registration OTP is: ${otp}`;
+  if (context === 'welcome') {
+    messageText = `Welcome to RoundRelay!\nYour OTP for registration is: ${otp}`;
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'RoundRelay - Registration OTP',
+    text: messageText,
+  });
+};
+
 // Generate JWT
 const generateToken = (user) => {
   const payload = { _id: user._id, email: user.email, name: user.name };
@@ -41,8 +64,16 @@ router.post('/register', requireCollegeEmail, async (req, res) => {
   const { name, email, password, graduationYear, department, context } = req.body;
 
   try {
-    const userExists = await User.findOne(buildEmailLookup(email)).select('_id');
-    if (userExists) return res.status(400).json({ message: 'Email already in use' });
+    const userExists = await User.findOne(buildEmailLookup(email)).select('_id email isVerified otp otpExpiry');
+    if (userExists) {
+      if (userExists.isVerified === true) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+
+      const otp = await setFreshOtp(userExists);
+      await sendRegistrationOtp({ email, otp, context });
+      return res.status(200).json({ message: 'Registration pending. A new OTP was sent to your email.' });
+    }
 
     const user = new User({
       name,
@@ -61,33 +92,8 @@ router.post('/register', requireCollegeEmail, async (req, res) => {
       await group.save();
     }
 
-    // Generate OTP and send email
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = Date.now() + 5 * 60 * 1000;
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
-
-    // Send OTP via email with context
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    let messageText = `Your RoundRelay registration OTP is: ${otp}`;
-    if (context === 'welcome') {
-      messageText = `Welcome to RoundRelay!\nYour OTP for registration is: ${otp}`;
-    }
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'RoundRelay - Registration OTP',
-      text: messageText,
-    });
+    const otp = await setFreshOtp(user);
+    await sendRegistrationOtp({ email, otp, context });
 
     res.status(201).json({ message: 'Registration successful. Please verify your email.' });
   } catch (error) {
@@ -173,14 +179,7 @@ router.post('/send-otp', requireCollegeEmail, async (req, res) => {
   const user = await User.findOneAndUpdate(buildEmailLookup(email), { otp, otpExpiry }).select('_id');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
-  // Send OTP via email with context
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const transporter = createMailTransport();
 
   let messageText = `Your RoundRelay OTP code is: ${otp}. This OTP is valid for 5 minutes. Do not share it with anyone.`;
   if (context === 'welcome') {
@@ -229,14 +228,7 @@ router.post('/forgot-password', requireCollegeEmail, async (req, res) => {
   user.otpExpiry = otpExpiry;
   await user.save();
 
-  // Send OTP via email with context
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const transporter = createMailTransport();
 
   let messageText = `RoundRelay password reset OTP: ${otp}. This one-time code is valid for 5 minutes. Do not share it with anyone.`;
   if (context === 'reset') {
