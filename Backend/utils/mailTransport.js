@@ -1,33 +1,37 @@
 const nodemailer = require('nodemailer');
 
-const RESEND_EMAIL_ENDPOINT = 'https://api.resend.com/emails';
-const RESEND_TIMEOUT_MS = 10000;
+const BREVO_EMAIL_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+const TRANSACTIONAL_EMAIL_TIMEOUT_MS = 10000;
 
-function createResendTransport() {
+function createBrevoTransport() {
   return {
     async sendMail(mail) {
-      const apiKey = process.env.RESEND_API_KEY?.trim();
-      const from = process.env.EMAIL_FROM?.trim();
+      const apiKey = process.env.BREVO_API_KEY?.trim();
+      const fromEmail = process.env.EMAIL_FROM?.trim();
 
-      if (!apiKey || !from) {
+      if (!apiKey || !fromEmail) {
         throw new Error('Transactional email service is not configured');
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), TRANSACTIONAL_EMAIL_TIMEOUT_MS);
 
       try {
-        const response = await fetch(RESEND_EMAIL_ENDPOINT, {
+        const response = await fetch(BREVO_EMAIL_ENDPOINT, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            accept: 'application/json',
+            'api-key': apiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from,
-            to: [mail.to],
+            sender: {
+              name: 'RoundRelay',
+              email: fromEmail,
+            },
+            to: [{ email: mail.to }],
             subject: mail.subject,
-            text: mail.text,
+            textContent: mail.text,
           }),
           signal: controller.signal,
         });
@@ -49,8 +53,8 @@ function createResendTransport() {
 }
 
 function createMailTransport() {
-  if (process.env.RESEND_API_KEY?.trim()) {
-    return createResendTransport();
+  if (process.env.BREVO_API_KEY?.trim()) {
+    return createBrevoTransport();
   }
 
   return nodemailer.createTransport({
