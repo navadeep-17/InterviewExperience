@@ -36,6 +36,7 @@ function AuthForm() {
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetMsg, setResetMsg] = useState('');
   const [showReset, setShowReset] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -83,9 +84,10 @@ function AuthForm() {
       return;
     }
 
-    if (isSignIn) {
-      // Direct login (no OTP)
-      try {
+    setMessage('');
+    setIsSubmitting(true);
+    try {
+      if (isSignIn) {
         const result = await apiRequest('/api/auth/login', {
           method: 'POST', auth: false,
           data: { email: formData.email, password: formData.password },
@@ -97,13 +99,7 @@ function AuthForm() {
         } else {
           setMessage(result?.message || 'Authentication failed!');
         }
-      } catch (error) {
-        if (error.status === undefined) throw error;
-        setMessage(error.data?.message || 'Authentication failed!');
-      }
-    } else {
-      // Registration with OTP
-      try {
+      } else {
         await apiRequest('/api/auth/register', {
           method: 'POST', auth: false,
           data: {
@@ -117,10 +113,15 @@ function AuthForm() {
         });
         setStep('otp');
         setMessage('OTP sent to your email. Please verify.');
-      } catch (error) {
-        if (error.status === undefined) throw error;
-        setMessage(error.data?.msg || error.data?.message || 'Registration failed!');
       }
+    } catch (error) {
+      if (error.status === undefined) {
+        setMessage('Unable to reach RoundRelay. Please try again.');
+      } else {
+        setMessage(error.data?.msg || error.data?.message || (isSignIn ? 'Authentication failed!' : 'Registration failed!'));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -140,8 +141,9 @@ function AuthForm() {
         setMessage(result?.message || 'OTP verification failed!');
       }
     } catch (error) {
-      if (error.status === undefined) throw error;
-      setMessage(error.data?.message || 'OTP verification failed!');
+      setMessage(error.status === undefined
+        ? 'Unable to reach RoundRelay. Please try again.'
+        : error.data?.message || 'OTP verification failed!');
     }
   };
 
@@ -157,8 +159,9 @@ function AuthForm() {
         setResetStep('otp');
         setResetMsg('OTP sent to your email.');
       } catch (error) {
-        if (error.status === undefined) throw error;
-        setResetMsg(error.data?.message || 'Failed to send OTP');
+        setResetMsg(error.status === undefined
+          ? 'Unable to reach RoundRelay. Please try again.'
+          : error.data?.message || 'Failed to send OTP');
       }
     } else {
       // Step 2: Verify OTP and set new password
@@ -177,8 +180,9 @@ function AuthForm() {
           setResetMsg('');
         }, 2000);
       } catch (error) {
-        if (error.status === undefined) throw error;
-        setResetMsg(error.data?.message || 'Failed to reset password');
+        setResetMsg(error.status === undefined
+          ? 'Unable to reach RoundRelay. Please try again.'
+          : error.data?.message || 'Failed to reset password');
       }
     }
   };
@@ -205,6 +209,7 @@ function AuthForm() {
                 }`}
                 onClick={() => setIsSignIn(true)}
                 type="button"
+                disabled={isSubmitting}
               >
                 Sign In
               </button>
@@ -216,6 +221,7 @@ function AuthForm() {
                 }`}
                 onClick={() => setIsSignIn(false)}
                 type="button"
+                disabled={isSubmitting}
               >
                 Sign Up
               </button>
@@ -244,7 +250,7 @@ function AuthForm() {
               <StatusMessage message={message} />
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" aria-busy={isSubmitting}>
               {!isSignIn && (
                 <>
                   <InputField placeholder="Full Name" name="fullName" type="text" value={formData.fullName} onChange={handleChange} />
@@ -297,9 +303,12 @@ function AuthForm() {
 
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition focus:outline-none focus:ring-4 focus:ring-indigo-100 disabled:opacity-50 transition-colors"
               >
-                {isSignIn ? 'Sign In' : 'Create Account'}
+                {isSubmitting
+                  ? (isSignIn ? 'Signing In…' : 'Creating Account…')
+                  : (isSignIn ? 'Sign In' : 'Create Account')}
               </button>
             </form>
           )}
